@@ -141,14 +141,14 @@ def run_model(
     depth_maps_list = []
     images_list = []
     final_mask_list = []
-
+    confidences = []
     # Loop through the outputs
     for pred in outputs:
         # Extract data from predictions
         depthmap_torch = pred["depth_z"][0].squeeze(-1)  # (H, W)
         intrinsics_torch = pred["intrinsics"][0]  # (3, 3)
         camera_pose_torch = pred["camera_poses"][0]  # (4, 4)
-
+        conf = pred["conf"][0].squeeze(-1)  # (H, W)
         # Compute new pts3d using depth, intrinsics, and camera pose
         pts3d_computed, valid_mask = depthmap_to_world_frame(
             depthmap_torch, intrinsics_torch, camera_pose_torch
@@ -174,6 +174,7 @@ def run_model(
         depth_maps_list.append(depthmap_torch.cpu().numpy())
         images_list.append(image)  # Add image to list
         final_mask_list.append(mask)  # Add final_mask to list
+        confidences.append(conf.cpu().numpy())  # Add confidence to list
 
     # Convert lists to numpy arrays with required shapes
     # extrinsic: (S, 3, 4) - batch of camera extrinsic matrices
@@ -184,6 +185,8 @@ def run_model(
 
     # world_points: (S, H, W, 3) - batch of 3D world points
     predictions["world_points"] = np.stack(world_points_list, axis=0)
+
+    predictions["conf"] = np.stack(confidences, axis=0)
 
     # depth: (S, H, W, 1) or (S, H, W) - batch of depth maps
     depth_maps = np.stack(depth_maps_list, axis=0)
@@ -501,6 +504,7 @@ def gradio_demo(
     show_cam=True,
     filter_black_bg=False,
     filter_white_bg=False,
+    conf_thres=3.0,
     apply_mask=True,
     show_mesh=True,
 ):
@@ -550,6 +554,7 @@ def gradio_demo(
         mask_black_bg=filter_black_bg,
         mask_white_bg=filter_white_bg,
         as_mesh=show_mesh,  # Use the show_mesh parameter
+        conf_percentile=conf_thres,
     )
     glbscene.export(file_obj=glbfile)
 
@@ -886,9 +891,10 @@ def update_visualization(
     frame_filter,
     show_cam,
     is_example,
+    conf_thres=3.0,
     filter_black_bg=False,
     filter_white_bg=False,
-    show_mesh=True,
+    show_mesh=False,
 ):
     """
     Reload saved predictions from npz, create (or reuse) the GLB for new parameters,
@@ -923,16 +929,17 @@ def update_visualization(
         f"glbscene_{frame_filter.replace('.', '_').replace(':', '').replace(' ', '_')}_cam{show_cam}_mesh{show_mesh}_black{filter_black_bg}_white{filter_white_bg}.glb",
     )
 
-    if not os.path.exists(glbfile):
-        glbscene = predictions_to_glb(
+    
+    glbscene = predictions_to_glb(
             predictions,
             filter_by_frames=frame_filter,
             show_cam=show_cam,
             mask_black_bg=filter_black_bg,
             mask_white_bg=filter_white_bg,
             as_mesh=show_mesh,
+            conf_percentile=conf_thres,
         )
-        glbscene.export(file_obj=glbfile)
+    glbscene.export(file_obj=glbfile)
 
     return (
         glbfile,
@@ -1225,6 +1232,15 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                 )
                 with gr.Column():
                     gr.Markdown("### Pointcloud Options: (live updates)")
+                    conf_thres = gr.Slider(
+                        minimum=0,
+                        maximum=100,
+                        value=50.0,
+                        step=0.1,
+                        label="Confidence Threshold Percentile (mask points below this)",
+                        interactive=True,
+                    )
+
                     show_cam = gr.Checkbox(label="Show Camera", value=True)
                     show_mesh = gr.Checkbox(label="Show Mesh", value=True)
                     filter_black_bg = gr.Checkbox(
@@ -1302,6 +1318,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             show_cam,
             filter_black_bg,
             filter_white_bg,
+            conf_thres,
             apply_mask_checkbox,
             show_mesh,
         ],
@@ -1334,6 +1351,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             frame_filter,
             show_cam,
             is_example,
+            conf_thres,
             filter_black_bg,
             filter_white_bg,
             show_mesh,
@@ -1347,6 +1365,24 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             frame_filter,
             show_cam,
             is_example,
+            conf_thres,
+            filter_black_bg,
+            filter_white_bg,
+            show_mesh,
+        ],
+        [reconstruction_output, log_output],
+    )
+    conf_thres.change(
+        update_visualization,
+        [
+            target_dir_output,
+            frame_filter,
+            show_cam,
+            is_example,
+            conf_thres,
+            filter_black_bg,
+            filter_white_bg,
+            show_mesh,
         ],
         [reconstruction_output, log_output],
     )
@@ -1357,8 +1393,10 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             frame_filter,
             show_cam,
             is_example,
+            conf_thres,
             filter_black_bg,
             filter_white_bg,
+            show_mesh,
         ],
         [reconstruction_output, log_output],
     ).then(
@@ -1387,6 +1425,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             frame_filter,
             show_cam,
             is_example,
+            conf_thres,
             filter_black_bg,
             filter_white_bg,
             show_mesh,
@@ -1411,7 +1450,6 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             measure_points_state,
         ],
     )
-
     show_mesh.change(
         update_visualization,
         [
@@ -1422,10 +1460,10 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
             filter_black_bg,
             filter_white_bg,
             show_mesh,
+            conf_thres,
         ],
         [reconstruction_output, log_output],
     )
-
     # -------------------------------------------------------------------------
     # Auto-update gallery whenever user uploads or changes their files
     # -------------------------------------------------------------------------

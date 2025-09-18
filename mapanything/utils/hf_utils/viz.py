@@ -160,6 +160,7 @@ def predictions_to_glb(
     show_cam=True,
     mask_ambiguous=False,
     as_mesh=True,
+    conf_percentile=None,
 ) -> trimesh.Scene:
     """
     Converts MapAnything predictions to a 3D scene represented as a GLB file.
@@ -226,6 +227,15 @@ def predictions_to_glb(
     mask = np.ones(len(vertices_3d), dtype=bool)
     final_mask = predictions["final_mask"].reshape(-1)
 
+    # Confidence masking
+    if conf_percentile is not None and "conf" in predictions:
+        #print ("Applying confidence masking...")
+        conf = predictions["conf"].reshape(-1)
+        threshold = np.percentile(conf, conf_percentile)
+        #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+        conf_mask = conf >= threshold
+        mask = mask & conf_mask
+
     if mask_black_bg:
         black_bg_mask = colors_rgb.sum(axis=1) >= 16
         mask = mask & black_bg_mask
@@ -288,6 +298,15 @@ def predictions_to_glb(
 
             # Create mask based on final mask
             mask = original_final_mask
+
+            # Confidence masking
+            if conf_percentile is not None and "conf" in predictions:
+                #print ("Applying confidence masking...")
+                conf = predictions["conf"][selected_frame_idx].reshape(-1)
+                threshold = np.percentile(conf, conf_percentile)
+                #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+                conf_mask = conf >= threshold
+                mask = mask & conf_mask.reshape(H, W)
 
             # Additional background masks if needed
             if mask_black_bg:
@@ -378,7 +397,13 @@ def predictions_to_glb(
                         & (frame_image[:, :, 2] > 240)
                     )
                     mask = mask & white_bg_mask
-
+                if conf_percentile is not None and "conf" in predictions:
+                    #print ("Applying confidence masking...")
+                    conf = predictions["conf"][frame_idx].reshape(-1)
+                    threshold = np.percentile(conf, conf_percentile)
+                    #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+                    conf_mask = conf >= threshold
+                    mask = mask & conf_mask.reshape(H, W)
                 # Create mesh for this frame
                 faces, vertices, vertex_colors = image_mesh(
                     frame_points * np.array([1, -1, 1], dtype=np.float32),
