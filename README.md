@@ -1,7 +1,7 @@
 <div align="center">
 <h1>MapAnything: Universal Feed-Forward Metric <br>3D Reconstruction</h1>
 <a href="https://map-anything.github.io/assets/MapAnything.pdf"><img src="https://img.shields.io/badge/Paper-blue" alt="Paper"></a>
-<a href=""><img src="https://img.shields.io/badge/arXiv-aaaa.bbbbb-b31b1b" alt="arXiv"></a>
+<a href="https://arxiv.org/abs/2509.13414"><img src="https://img.shields.io/badge/arXiv-2509.13414-b31b1b" alt="arXiv"></a>
 <a href="https://map-anything.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 <a href="https://huggingface.co/spaces/facebook/map-anything"><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
 <br>
@@ -547,10 +547,10 @@ We thank the folowing projects for their open-source code: [DUSt3R](https://gith
 If you find our repository useful, please consider giving it a star ⭐ and citing our paper in your work:
 
 ```bibtex
-@inproceedings{keetha2025mapanything,
+@misc{keetha2025mapanything,
   title={{MapAnything}: Universal Feed-Forward Metric {3D} Reconstruction},
   author={Nikhil Keetha and Norman M\"{u}ller and Johannes Sch\"{o}nberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bul\`{o} and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
-  booktitle={arXiv},
+  note={arXiv preprint arXiv:2509.13414},
   year={2025}
 }
 ```
