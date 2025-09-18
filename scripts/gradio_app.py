@@ -891,7 +891,7 @@ def update_visualization(
     frame_filter,
     show_cam,
     is_example,
-    conf_thres=None
+    conf_thres=None,
     filter_black_bg=False,
     filter_white_bg=False,
     show_mesh=True,
