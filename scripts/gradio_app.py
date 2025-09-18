@@ -1235,9 +1235,9 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                     conf_thres = gr.Slider(
                         minimum=0,
                         maximum=100,
-                        value=50.0,
+                        value=0,
                         step=0.1,
-                        label="Confidence Threshold Percentile (mask points below this)",
+                        label="Confidence Threshold Percentile (mask 3D points below this)",
                         interactive=True,
                     )
 
