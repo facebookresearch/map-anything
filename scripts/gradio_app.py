@@ -891,10 +891,10 @@ def update_visualization(
     frame_filter,
     show_cam,
     is_example,
-    conf_thres=3.0,
+    conf_thres=None
     filter_black_bg=False,
     filter_white_bg=False,
-    show_mesh=False,
+    show_mesh=True,
 ):
     """
     Reload saved predictions from npz, create (or reuse) the GLB for new parameters,
