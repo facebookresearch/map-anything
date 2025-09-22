@@ -246,7 +246,7 @@ def preprocess_input_views_for_inference(
             depth_z = view["depth_z"]
             ray_directions = processed_view["ray_directions"]
             ray_directions_unit_plane = ray_directions / ray_directions[..., 2:3]
-            pts3d_cam = depth_z * ray_directions_unit_plane
+            pts3d_cam = depth_z[..., None] * ray_directions_unit_plane
             depth_along_ray = torch.norm(pts3d_cam, dim=-1, keepdim=True)
             processed_view["depth_along_ray"] = depth_along_ray
             del processed_view["depth_z"]
