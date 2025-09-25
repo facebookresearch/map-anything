@@ -13,23 +13,6 @@ import os
 
 def load_hf_token():
     """Load HuggingFace access token from local file"""
-    token_file_paths = [
-        "/home/aknapitsch/hf_token.txt",
-    ]
-
-    for token_path in token_file_paths:
-        if os.path.exists(token_path):
-            try:
-                with open(token_path, "r") as f:
-                    token = f.read().strip()
-                print(f"Loaded HuggingFace token from: {token_path}")
-                return token
-            except Exception as e:
-                print(f"Error reading token from {token_path}: {e}")
-                continue
-        else:
-            print(token_path, "token_path doesnt exist")
-
     # Also try environment variable
     # see https://huggingface.co/docs/hub/spaces-overview#managing-secrets on options
     token = (
