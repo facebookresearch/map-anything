@@ -13,6 +13,7 @@ We also provide a HuggingFace dataset which contains the [pre-computed metadata]
 5. ✅ [ETH3D](https://www.eth3d.net/)
 6. ✅ [Mapillary Planet Scale Depth & Reconstructions](https://www.mapillary.com/dataset/depth) (MPSD)
 7. ✅ [MegaDepth (including Tanks & Temples)](https://www.cs.cornell.edu/projects/megadepth/)
+8. ✅ [AerialMegaDepth](https://aerial-megadepth.github.io/)
 8. ✅ [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
 9. ✅ [Parallel Domain 4D](https://gcd.cs.columbia.edu/#datasets)
 10. ✅ [SAIL-VOS 3D](https://sailvos.web.illinois.edu/_site/_site/index.html)
