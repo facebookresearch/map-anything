@@ -6,8 +6,7 @@
 """
 Download AerialMegaDepth dataset from HuggingFace.
 
-References: Khiem Vuong (CMU)
-https://github.com/kvuong2711/aerial-megadepth/blob/main/data_generation/download_data_hf.py
+References: https://github.com/kvuong2711/aerial-megadepth/blob/main/data_generation/download_data_hf.py
 """
 
 from __future__ import annotations
