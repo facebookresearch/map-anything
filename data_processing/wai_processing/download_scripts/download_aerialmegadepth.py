@@ -13,6 +13,7 @@ https://github.com/kvuong2711/aerial-megadepth/blob/main/data_generation/downloa
 from __future__ import annotations
 
 import argparse
+import shutil
 from pathlib import Path
 from huggingface_hub import snapshot_download
 from wai_processing.utils.download import (
@@ -22,7 +23,7 @@ from wai_processing.utils.download import (
 
 # Configuration for AerialMegaDepth dataset
 REPO_ID = "kvuong2711/aerialmegadepth"
-ALLOW_PATTERNS = ("**.zip")
+ALLOW_PATTERNS = ("**.zip", "aerial_megadepth_all.npz")
 DEFAULT_MAX_WORKERS = 8
 ZIP_DIR_NAME = "aerialmegadepth_zip"
 EXTRACT_DIR_NAME = "aerialmegadepth"
@@ -75,6 +76,9 @@ def main():
 
     # 2. Extract zip files
     extract_zip_archives(target_dir=zip_dir, output_dir=extract_dir, n_workers=args.max_workers)
+
+    # 3. Move the aerial_megadepth_all.npz to the extract_dir
+    shutil.move(zip_dir / "aerial_megadepth_all.npz", extract_dir / "aerial_megadepth_all.npz")
 
     print("All tasks completed successfully.")
 
