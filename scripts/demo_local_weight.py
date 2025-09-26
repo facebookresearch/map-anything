@@ -8,6 +8,7 @@ Usage:
 import argparse
 import os
 from time import time
+import json
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -69,6 +70,8 @@ def get_parser() -> argparse.ArgumentParser:
         default="mapanything.glb",
         help="Output path for GLB file",
     )
+    parser.add_argument('--local_config', type=json.loads, default=LOCAL_CONFIG,
+                        help='Local config for loading a MapAnything model. To set this argument pass a string in this format: \'{"key": "value", ...}\')')
     return parser
 
 
@@ -79,8 +82,8 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    print("Initializing MapAnything model (local weights)...")
-    model = initialize_mapanything_local(LOCAL_CONFIG, device)
+    print(f"Initializing MapAnything model from local weights with config: {args.local_config}")
+    model = initialize_mapanything_local(args.local_config, device)
     print("Successfully loaded pretrained weights")
 
     print(f"Loading images from: {args.image_folder}")
