@@ -28,6 +28,10 @@ Use the provided bash script `download_mpsd.sh` and unzip the downloaded zip fil
 Use the provided python script `download_megadepth.py`. MegaDepth also includes all the Tanks & Temples scenes.
 **Source:** [MegaDepth Project](https://www.cs.cornell.edu/projects/megadepth/)
 
+## AerialMegaDepth
+Use the provided python script `download_aerialmegadepth.py`.
+**Source:** [AerialMegaDepth](https://aerial-megadepth.github.io/)
+
 ## MVS-Synth
 Use the provided python script `download_mvs_synth.py`.
 **Source:** [MVS-Synth Dataset](https://phuang17.github.io/DeepMVS/mvs-synth.html)
