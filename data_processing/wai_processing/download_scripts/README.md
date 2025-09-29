@@ -21,7 +21,7 @@ Use the provided python script `download_eth3d.py`.
 **Source:** [RobustMVD Benchmark](https://github.com/lmb-freiburg/robustmvd/tree/master/rmvd/data/scripts)
 
 ## Mapillary Planet Scale Depth & Reconstructions
-Use the provided bash script `download_mpsd.sh` and unzip the downloaded zip files.
+Follow the instructions in the dataset's website to download the zip volumes, then unzip them.
 **Source:** [Mapillary Planet Scale Depth](https://www.mapillary.com/dataset/depth)
 
 ## MegaDepth
