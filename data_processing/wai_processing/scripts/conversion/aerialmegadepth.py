@@ -10,7 +10,7 @@ Reference: https://github.com/kvuong2711/aerial-megadepth/blob/main/data_generat
 import logging
 import os
 from pathlib import Path
-
+import cv2
 import h5py
 import numpy as np
 import torch
@@ -225,7 +225,8 @@ def process_aerialmegadepth_scene(cfg, scene_name):
         f"Found {len(images_to_process)} images to process for scene {scene_name}"
     )
 
-    print(f"Found {len(images_to_process)} images to process for scene {scene_name}")
+    # Segmentation masks
+    segmasks_dir = Path(cfg.original_root) / "aerialmegadepth_segmasks" / scene_name
 
     # Process each image in the subscene in natural sorted order
     for image_id in tqdm(natsorted(images_to_process)):
@@ -259,6 +260,12 @@ def process_aerialmegadepth_scene(cfg, scene_name):
 
         # Get the dimensions of the depth map
         H, W = depthmap.shape
+
+        # Load segmentation map to filter out invalid depth values at sky regions
+        segmask_path = segmasks_dir / (image_id + ".png")
+        assert segmask_path.exists(), f"Segmentation mask not found at {segmask_path}"
+        segmask = cv2.imread(str(segmask_path))[:, :, 0]
+        depthmap[segmask == 2] = 0 # Remove the sky from the depthmap (ADE20K)
 
         # Save depth map to EXR file using WAI
         rel_depth_out_path = Path("depth") / (Path(image_id).stem + ".exr")
