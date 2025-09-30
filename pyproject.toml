@@ -18,12 +18,10 @@ dependencies = [
     "pillow-heif",
     "plyfile",
     "python-box",
+    "rerun-sdk~=0.24.1",
     "safetensors",
     "tensorboard",
     "tqdm",
-    "torchaudio", ## Temp for AWS
-    "torch~=2.6.0", ## Temp for AWS
-    "torchvision", ## Temp for AWS
     "trimesh",
     "uniception",
 ]

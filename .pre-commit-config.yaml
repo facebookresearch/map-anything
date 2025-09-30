@@ -1,0 +1,23 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+    -   id: check-yaml
+    -   id: end-of-file-fixer
+    -   id: trailing-whitespace
+-   repo: local
+    hooks:
+    -   id: ruff-format
+        name: Ruff Format
+        entry: |
+            ruff format
+        language: python
+        stages: [pre-commit]
+        types_or: [python, pyi, jupyter]
+    -   id: ruff-check
+        name: Ruff Check
+        entry: |
+            ruff check --fix --output-format=github
+        language: python
+        stages: [pre-commit]
+        types_or: [python, pyi, jupyter]
