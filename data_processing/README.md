@@ -80,7 +80,12 @@ python -m wai_processing.scripts.conversion.<dataset_name> \
 
 # Run undistortion (modalities can be dataset specific)
 python -m wai_processing.scripts.undistort \
-          <specific_configs>.yaml
+          <specific_configs>.yaml \
+          root=<dataset_path>
+
+# Run rendering (relevant for datasets like ScanNet++V2)
+python -m wai_processing.scripts.run_rendering \
+          root=<dataset_path>
 
 # Run covisibility
 python -m wai_processing.scripts.covisibility \

@@ -27,6 +27,69 @@ DISTORTION_PARAM_KEYS = [
 ]  # order corresponds to the OpenCV convention
 CAMERA_KEYS = PINHOLE_CAM_KEYS + DISTORTION_PARAM_KEYS
 
+# Retrieve all available camera models and their associated parameters using pycolmap
+CAM_STRS_TO_PARAMS = {
+    # For PINHOLE we use separate focal length for x and y, even though almost always we
+    # will have fx=fy.
+    "PINHOLE": ["fl_x", "fl_y", "cx", "cy"],
+    # Undistortion supported by OPenCV
+    "OPENCV": ["fl_x", "fl_y", "cx", "cy", "k1", "k2", "p1", "p2"],
+    "OPENCV_FISHEYE": ["fl_x", "fl_y", "cx", "cy", "k1", "k2", "k3", "k4"],
+    # Unistortion supported by pycolmap
+    "FULL_OPENCV": [
+        "fl_x",
+        "fl_y",
+        "cx",
+        "cy",
+        "k1",
+        "k2",
+        "p1",
+        "p2",
+        "k3",
+        "k4",
+        "k5",
+        "k6",
+    ],
+    "FOV": ["fl_x", "fl_y", "cx", "cy", "omega"],
+    "THIN_PRISM_FISHEYE": [
+        "fl_x",
+        "fl_y",
+        "cx",
+        "cy",
+        "k1",
+        "k2",
+        "p1",
+        "p2",
+        "k3",
+        "k4",
+        "sx1",
+        "sy1",
+    ],
+    "RAD_TAN_THIN_PRISM_FISHEYE": [
+        "fl_x",
+        "fl_y",
+        "cx",
+        "cy",
+        "k0",
+        "k1",
+        "k2",
+        "k3",
+        "k4",
+        "k5",
+        "p0",
+        "p1",
+        "s0",
+        "s1",
+        "s2",
+        "s3",
+    ],
+    # Non-OpenCV and non-pycolmap camera models
+    "EQUIRECTANGULAR": [],  # Only width and height needed
+}
+# This is just an unordered helper list for all cam params and for distortion parameters
+# which should never occur for a pinhole camera
+ALL_CAM_PARAMS = list(set().union(*CAM_STRS_TO_PARAMS.values())) + ["w", "h"]
+
 
 def interpolate_intrinsics(
     frame1: dict[str, Any],
@@ -266,3 +329,24 @@ def intrinsics_to_fov(
         of view in radians, both with shape (N,).
     """
     return 2 * torch.atan((w / 2) / fx), 2 * torch.atan((h / 2) / fy)
+
+
+def cv2gl(
+    c2ws: torch.Tensor | np.ndarray,
+    return_cmat: bool = False,
+) -> torch.Tensor | np.ndarray | tuple[torch.Tensor | np.ndarray, np.ndarray]:
+    """
+    Convert camera poses from OpenCV to OpenGL coordinate system.
+
+    Args:
+        c2ws (torch.Tensor or np.ndarray): Camera poses (batch_size, 4, 4) or (4, 4)
+        return_cmat (bool): If True, return the conversion matrix along with the transformed poses
+
+    Returns:
+        torch.Tensor or np.ndarray: Transformed camera poses (batch_size, 4, 4) or (4, 4)
+        np.ndarray (optional): Conversion matrix if return_cmat is True
+    """
+    cmat = _gl_cv_cmat()
+    if return_cmat:
+        return _apply_transformation(c2ws, cmat), cmat
+    return _apply_transformation(c2ws, cmat)

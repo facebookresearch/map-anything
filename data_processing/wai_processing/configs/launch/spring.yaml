@@ -6,7 +6,7 @@ cpus: 10
 mem: 20
 scenes_per_job: 5  # Only 50 scenes --> 10 jobs
 conda_env: # pass the name of our conda environment
-nodelist: 
+nodelist:
 
 stages:
   conversion:
@@ -23,5 +23,5 @@ stages:
     gpus: 1
   covisibility_pred: # since some scenes in Spring do not contain GT depth
     script: covisibility.py
-    config: covisibility/covisibility_pred_depth_no_confidence.yaml  # moge has no confidence
+    config: covisibility/covisibility_pred_depth_moge.yaml
     gpus: 1

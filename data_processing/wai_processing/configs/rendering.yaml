@@ -1,0 +1,38 @@
+root:  # needs to be set via argument: root=<wai_dataset_root_path>
+overwrite: True
+
+# select rendering type
+rendering_type: labeled_mesh # [mesh, scene]
+
+# select mesh to render
+mesh_to_render: labeled_mesh.ply
+
+supported_mesh_formats:
+  - ply
+  - obj
+  - glb
+
+frame_modalities_to_render:
+  - rendered_image
+  - rendered_depth
+  - rendered_mesh_faces
+
+supported_frame_modalities_to_render:
+  - rendered_image
+  - rendered_depth
+  - rendered_mesh_faces
+
+scene_filters:
+  - exists: ${mesh_to_render}
+  - exists: scene_meta.json
+  - process_state: [undistortion, finished]
+  - process_state_not: [rendering, finished]
+
+invalid_face_id: -1
+
+# set near and far planes
+near: 0.01
+far: 1000
+
+# optional mesh transform
+# mesh_transform: [[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]

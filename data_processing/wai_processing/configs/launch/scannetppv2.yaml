@@ -16,6 +16,10 @@ stages:
   undistortion:
     script: undistort.py
     config: undistortion/scannetppv2.yaml
+  rendering:
+    script: run_rendering.py
+    config: rendering.yaml
+    gpus: 1
   covisibility:
     script: covisibility.py
     config: covisibility/covisibility_gt_depth.yaml

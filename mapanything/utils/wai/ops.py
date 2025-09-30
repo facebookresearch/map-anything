@@ -109,6 +109,86 @@ def get_dtype_device(
     return dtype, device
 
 
+def to_dtype_device(
+    data: torch.Tensor | np.ndarray | dict | list | int | float,
+    dtype: torch.dtype | np.dtype | str | None = None,
+    device: torch.device | str | type | None = None,
+    convert_scalar: bool = False,
+) -> torch.Tensor | np.ndarray | dict | list | int | float:
+    """
+    Convert data to specified dtype and device.
+
+    This function handles conversion between numpy arrays and PyTorch tensors,
+    as well as recursive conversion for nested data structures like dictionaries and lists.
+
+    Args:
+        data: Input data (torch.Tensor, np.ndarray, dict, list, or scalar)
+        dtype: Target data type (torch dtype, numpy dtype, or None)
+        device: Target device (torch device, 'cuda', 'cpu', np.ndarray, torch.Tensor, or None)
+        convert_scalar: Whether to convert scalar values (int, float) to tensors/arrays
+
+    Returns:
+        Converted data with specified dtype and on specified device
+    """
+    # Handle case where device is passed in dtype parameter
+    if device is None:
+        if dtype is None:
+            raise ValueError("Either `dtype` or `device` must be provided.")
+
+        if str(dtype).startswith("cuda") or str(dtype).startswith("cpu"):
+            device = dtype
+            dtype = None
+        else:
+            raise NotImplementedError()
+
+    # Set default dtype based on device
+    if dtype is None:
+        if device is not None and (
+            str(device).startswith("cuda") or str(device).startswith("cpu")
+        ):
+            dtype = torch.float
+        else:
+            dtype = np.float32
+
+    # Handle torch.Tensor
+    if isinstance(data, torch.Tensor):
+        if device == np.ndarray:
+            return data.detach().cpu().numpy().astype(dtype)
+        return data.to(device=device, dtype=dtype)
+
+    # Handle numpy.ndarray
+    elif isinstance(data, np.ndarray):
+        if device == torch.Tensor:
+            return torch.from_numpy(data).to(dtype=dtype, device=device)
+        return data.astype(dtype)
+
+    # Handle dictionary (recursively)
+    elif isinstance(data, dict):
+        return {
+            k: to_dtype_device(v, dtype, device, convert_scalar=convert_scalar)
+            for k, v in data.items()
+        }
+
+    # Handle list (recursively)
+    elif isinstance(data, list):
+        return [
+            to_dtype_device(x, dtype, device, convert_scalar=convert_scalar)
+            for x in data
+        ]
+
+    # Handle scalar values
+    else:
+        if convert_scalar and isinstance(data, (int, float)):
+            if device == np.ndarray:
+                # Fix: scalars don't have astype method
+                return np.array(data, dtype=dtype)
+            else:
+                return torch.tensor(data, dtype=dtype, device=device)
+
+    # Return original data if no conversion was applied
+    return data
+
+
 def crop(
     data: np.ndarray | torch.Tensor | Image.Image,
     bbox: tuple[int, int, int, int] | tuple[int, int],
@@ -169,6 +249,38 @@ def crop(
         return cropped_data
     else:
         raise TypeError(f"Unsupported data type '{type(data)}'.")
+
+
+def to_torch_device_contiguous(
+    data_dict: dict[str, dict | np.ndarray | torch.Tensor],
+    device: torch.device | str,
+    contiguous: bool = False,
+) -> dict[str, dict | torch.Tensor]:
+    """
+    This function handles conversion between a dict of heterogeneous numpy arrays and torch tensors,
+    supporting recursion and creation of torch contiguous tensors.
+
+    Args:
+        data: Input data (torch.Tensor, np.ndarray, dict, list, or scalar)
+        device: Target device (torch device, 'cuda', 'cpu')
+
+    Returns:
+        A dict of torch tensors, optionally contiguous in memory and loaded on the specified device.
+    """
+
+    result_dict = {}
+    for k, v in data_dict.items():
+        if isinstance(v, dict):
+            result_dict[k] = to_torch_device_contiguous(v, device, contiguous)
+        elif isinstance(v, np.ndarray):
+            result_dict[k] = torch.from_numpy(v).to(device)
+            if contiguous:
+                result_dict[k] = result_dict[k].contiguous()
+        elif isinstance(v, torch.Tensor):
+            result_dict[k] = v.to(device).contiguous()
+        else:
+            raise ValueError(f"Found an unsupported value type {type(v)=} for key {k}.")
+    return result_dict
 
 
 def stack(
