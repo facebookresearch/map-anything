@@ -105,7 +105,7 @@ The scripts include optimized settings for AWS multi-node training with EFA netw
 
 ## Dataset Coverage
 
-The training scripts support all 13 training datasets (with appropriate splits) converted to WAI format:
+The training scripts support all 14 training datasets (with appropriate splits) converted to WAI format:
 
 1. ✅ [Aria Synthetic Environments](https://www.projectaria.com/datasets/ase/)
 2. ✅ [BlendedMVS](https://github.com/YoYo000/BlendedMVS)
