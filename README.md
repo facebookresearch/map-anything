@@ -65,6 +65,7 @@ MapAnything is a simple, end-to-end trained transformer model that directly regr
   - [Online Demo](#online-demo)
   - [Local Gradio Demo](#local-gradio-demo)
   - [Rerun Demo](#rerun-demo)
+  - [Demo Inference on COLMAP outputs](#demo-inference-on-colmap-outputs)
 - [COLMAP & GSplat Support](#colmap--gsplat-support)
   - [Exporting to COLMAP Format](#exporting-to-colmap-format)
   - [Integration with Gaussian Splatting](#integration-with-gaussian-splatting)
@@ -417,7 +418,7 @@ We provide a demo script to run MapAnything inference on COLMAP outputs. The scr
 # Terminal 1: Start the Rerun server
 rerun --serve --port 2004 --web-viewer-port 2006
 
-# Terminal 2: Run MapAnything demo
+# Terminal 2: Run MapAnything inference on COLMAP output folder
 # Use --memory_efficient_inference for running inference on a larger number of views
 python scripts/demo_inference_on_colmap_outputs.py \
     --colmap_path /path/to/your/colmap_output \
