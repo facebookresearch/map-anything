@@ -1,0 +1,9 @@
+original_root: # path of raw downloaded dataset
+root: # path of wai-formatted dataset
+
+dataset_name: aerialmegadepth
+version: 0.1
+overwrite: True
+
+scene_filters:
+  - process_state_not: [conversion, finished]

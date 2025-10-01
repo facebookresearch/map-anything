@@ -1591,6 +1591,18 @@ class MegaDepthSplits:
         self.val_split_scenes = ["0015_0", "0015_1", "0022_0"]
 
 
+class AerialMegaDepthSplits:
+    """
+    This class contains the information about the splits of the AerialMegaDepth dataset.
+    """
+
+    def __init__(self):
+        """
+        Validation split is based on scenes used in DUSt3R.
+        """
+        self.val_split_scenes = ["0015", "0015", "0022"]
+        
+
 class SpringSplits:
     """
     This class contains the information about the splits of the Spring dataset.

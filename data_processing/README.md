@@ -13,13 +13,14 @@ We also provide a HuggingFace dataset which contains the [pre-computed metadata]
 5. ✅ [ETH3D](https://www.eth3d.net/)
 6. ✅ [Mapillary Planet Scale Depth & Reconstructions](https://www.mapillary.com/dataset/depth) (MPSD)
 7. ✅ [MegaDepth (including Tanks & Temples)](https://www.cs.cornell.edu/projects/megadepth/)
-8. ✅ [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
-9. ✅ [Parallel Domain 4D](https://gcd.cs.columbia.edu/#datasets)
-10. ✅ [SAIL-VOS 3D](https://sailvos.web.illinois.edu/_site/_site/index.html)
-11. ✅ [ScanNet++ v2](https://kaldir.vc.in.tum.de/scannetpp/)
-12. ✅ [Spring](https://spring-benchmark.org/)
-13. ✅ [TartanAirV2 Wide Baseline](https://uniflowmatch.github.io/)
-14. ✅ [UnrealStereo4K](https://github.com/fabiotosi92/SMD-Nets)
+8. ✅ [AerialMegaDepth](https://aerial-megadepth.github.io/)
+9. ✅ [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
+10. ✅ [Parallel Domain 4D](https://gcd.cs.columbia.edu/#datasets)
+11. ✅ [SAIL-VOS 3D](https://sailvos.web.illinois.edu/_site/_site/index.html)
+12. ✅ [ScanNet++ v2](https://kaldir.vc.in.tum.de/scannetpp/)
+13. ✅ [Spring](https://spring-benchmark.org/)
+14. ✅ [TartanAirV2 Wide Baseline](https://uniflowmatch.github.io/)
+15. ✅ [UnrealStereo4K](https://github.com/fabiotosi92/SMD-Nets)
 
 ## Download Instructions:
 

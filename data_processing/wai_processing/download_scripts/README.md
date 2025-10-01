@@ -28,6 +28,10 @@ Follow the instructions in the dataset's website to download the zip volumes, th
 Use the provided python script `download_megadepth.py`. MegaDepth also includes all the Tanks & Temples scenes.
 **Source:** [MegaDepth Project](https://www.cs.cornell.edu/projects/megadepth/)
 
+## AerialMegaDepth
+Use the provided python script `download_aerialmegadepth.py`.
+**Source:** [AerialMegaDepth](https://aerial-megadepth.github.io/)
+
 ## MVS-Synth
 Use the provided python script `download_mvs_synth.py`.
 **Source:** [MVS-Synth Dataset](https://phuang17.github.io/DeepMVS/mvs-synth.html)
