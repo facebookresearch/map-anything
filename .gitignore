@@ -5,6 +5,7 @@ local/
 wandb/
 data_processing/wai_processing/third_party
 hydra/
+private/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
