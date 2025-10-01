@@ -1,3 +1,8 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the Apache License, Version 2.0
+# found in the LICENSE file in the root directory of this source tree.
+
 """
 MapAnything Demo: Offline Inference with Local Weights
 
@@ -6,9 +11,9 @@ Usage:
 """
 
 import argparse
+import json
 import os
 from time import time
-import json
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -19,7 +24,6 @@ from mapanything.utils.geometry import depthmap_to_world_frame
 from mapanything.utils.hf_utils.hf_helpers import initialize_mapanything_local
 from mapanything.utils.image import load_images
 from mapanything.utils.viz import predictions_to_glb
-
 
 LOCAL_CONFIG = {
     "path": "configs/train.yaml",
@@ -70,8 +74,12 @@ def get_parser() -> argparse.ArgumentParser:
         default="mapanything.glb",
         help="Output path for GLB file",
     )
-    parser.add_argument('--local_config', type=json.loads, default=LOCAL_CONFIG,
-                        help='Local config for loading a MapAnything model. To set this argument pass a string in this format: \'{"key": "value", ...}\')')
+    parser.add_argument(
+        "--local_config",
+        type=json.loads,
+        default=LOCAL_CONFIG,
+        help='Local config for loading a MapAnything model. To set this argument pass a string in this format: \'{"key": "value", ...}\')',
+    )
     return parser
 
 
@@ -82,7 +90,9 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    print(f"Initializing MapAnything model from local weights with config: {args.local_config}")
+    print(
+        f"Initializing MapAnything model from local weights with config: {args.local_config}"
+    )
     model = initialize_mapanything_local(args.local_config, device)
     print("Successfully loaded pretrained weights")
 
