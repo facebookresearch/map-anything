@@ -128,13 +128,12 @@ class AerialMegaDepthWAI(BaseDataset):
             depthmap = np.nan_to_num(depthmap, nan=0.0, posinf=0.0, neginf=0.0)
 
             # Get the non_ambiguous_mask and ensure it matches image resolution
-            # non_ambiguous_mask = view_data["pred_mask/moge2"].numpy().astype(int)
-            # non_ambiguous_mask = cv2.resize(
-            #     non_ambiguous_mask,
-            #     (image.shape[1], image.shape[0]),
-            #     interpolation=cv2.INTER_NEAREST,
-            # )
-            non_ambiguous_mask = np.ones((depthmap.shape[0], depthmap.shape[1])).astype(int)
+            non_ambiguous_mask = view_data["pred_mask/moge2"].numpy().astype(int)
+            non_ambiguous_mask = cv2.resize(
+                non_ambiguous_mask,
+                (image.shape[1], image.shape[0]),
+                interpolation=cv2.INTER_NEAREST,
+            )
 
             # Mask out the GT depth using the non_ambiguous_mask
             depthmap = np.where(non_ambiguous_mask, depthmap, 0)
