@@ -1200,47 +1200,49 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             per_sample_cam_input_mask & per_sample_geometric_input_mask
         )
 
-        # Compute the pose quats and trans for all the non-reference views in the frame of the reference view 0
-        # Returned pose quats and trans represent identity pose for views/samples where the camera input mask is False
-        pose_quats_across_views, pose_trans_across_views, per_sample_cam_input_mask = (
-            self._compute_pose_quats_and_trans_for_across_views_in_ref_view(
+        if any([('camera_pose_quats' in view) and ('camera_pose_trans' in view) for view in views]):
+            # Compute the pose quats and trans for all the non-reference views in the frame of the reference view 0
+            # Returned pose quats and trans represent identity pose for views/samples where the camera input mask is False
+            pose_quats_across_views, pose_trans_across_views, per_sample_cam_input_mask = (
+                self._compute_pose_quats_and_trans_for_across_views_in_ref_view(
+                    views,
+                    num_views,
+                    device,
+                    dtype,
+                    batch_size_per_view,
+                    per_sample_cam_input_mask,
+                )
+            )
+            # Encode the cam quat and trans and fuse with the image encoder features
+            all_encoder_features_across_views = self._encode_and_fuse_cam_quats_and_trans(
                 views,
                 num_views,
-                device,
-                dtype,
                 batch_size_per_view,
+                all_encoder_features_across_views,
+                pose_quats_across_views,
+                pose_trans_across_views,
                 per_sample_cam_input_mask,
             )
-        )
+    
+        if any(['ray_directions_cam' in view for view in views]):
+            # Encode the ray directions and fuse with the image encoder features
+            all_encoder_features_across_views = self._encode_and_fuse_ray_dirs(
+                views,
+                num_views,
+                batch_size_per_view,
+                all_encoder_features_across_views,
+                per_sample_ray_dirs_input_mask,
+            )
 
-        # Encode the ray directions and fuse with the image encoder features
-        all_encoder_features_across_views = self._encode_and_fuse_ray_dirs(
-            views,
-            num_views,
-            batch_size_per_view,
-            all_encoder_features_across_views,
-            per_sample_ray_dirs_input_mask,
-        )
-
-        # Encode the depths and fuse with the image encoder features
-        all_encoder_features_across_views = self._encode_and_fuse_depths(
-            views,
-            num_views,
-            batch_size_per_view,
-            all_encoder_features_across_views,
-            per_sample_depth_input_mask,
-        )
-
-        # Encode the cam quat and trans and fuse with the image encoder features
-        all_encoder_features_across_views = self._encode_and_fuse_cam_quats_and_trans(
-            views,
-            num_views,
-            batch_size_per_view,
-            all_encoder_features_across_views,
-            pose_quats_across_views,
-            pose_trans_across_views,
-            per_sample_cam_input_mask,
-        )
+        if any(['depth_along_ray' in view for view in views]):
+            # Encode the depths and fuse with the image encoder features
+            all_encoder_features_across_views = self._encode_and_fuse_depths(
+                views,
+                num_views,
+                batch_size_per_view,
+                all_encoder_features_across_views,
+                per_sample_depth_input_mask,
+            )
 
         # Normalize the fused features (permute -> normalize -> permute)
         all_encoder_features_across_views = all_encoder_features_across_views.permute(
