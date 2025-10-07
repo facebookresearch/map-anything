@@ -100,6 +100,14 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
     views_example = []
     processed_count = 0
 
+    # Get a list of all colmap image names
+    colmap_image_names = set(img_info.name for img_info in images_colmap.values())
+    # Find the unposed images (in images/ but not in colmap)
+    unposed_images = available_images - colmap_image_names
+
+    if verbose:
+        print(f"Found {len(unposed_images)} images without COLMAP poses")
+
     # Process images in COLMAP order
     for img_id, img_info in images_colmap.items():
         # Apply stride
@@ -172,9 +180,46 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
                 print(f"Warning: Failed to load data for {img_name}: {e}")
             processed_count += 1
             continue
+    
+    # process unposed images (without COLMAP poses)
+    for img_name in unposed_images:
+        # Apply stride
+        if processed_count % stride != 0:
+            processed_count += 1
+            continue
+
+        image_path = os.path.join(images_folder, img_name)
+
+        try:
+            # Load image
+            image = Image.open(image_path).convert("RGB")
+            image_array = np.array(image).astype(np.uint8)  # (H, W, 3) - [0, 255]
+
+            # Convert to tensor
+            image_tensor = torch.from_numpy(image_array)  # (H, W, 3)
+
+            view = {
+                "img": image_tensor,  # (H, W, 3) - [0, 255]
+                # No intrinsics or pose available
+            }
+
+            views_example.append(view)
+            processed_count += 1
+
+            if verbose:
+                print(
+                    f"Loaded unposed view {len(views_example) - 1}: {img_name} (shape: {image_array.shape})"
+                )
+
+        except Exception as e:
+            if verbose:
+                print(f"Warning: Failed to load data for {img_name}: {e}")
+            processed_count += 1
+            continue
+
 
     if not views_example:
-        raise ValueError("No valid COLMAP data found")
+        raise ValueError("No valid images found")
 
     if verbose:
         print(f"Successfully loaded {len(views_example)} views with stride={stride}")
