@@ -229,10 +229,10 @@ def predictions_to_glb(
 
     # Confidence masking
     if conf_percentile is not None and "conf" in predictions:
-        #print ("Applying confidence masking...")
+        # print ("Applying confidence masking...")
         conf = predictions["conf"].reshape(-1)
         threshold = np.percentile(conf, conf_percentile)
-        #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+        # print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
         conf_mask = conf >= threshold
         mask = mask & conf_mask
 
@@ -301,10 +301,10 @@ def predictions_to_glb(
 
             # Confidence masking
             if conf_percentile is not None and "conf" in predictions:
-                #print ("Applying confidence masking...")
+                # print ("Applying confidence masking...")
                 conf = predictions["conf"][selected_frame_idx].reshape(-1)
                 threshold = np.percentile(conf, conf_percentile)
-                #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+                # print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
                 conf_mask = conf >= threshold
                 mask = mask & conf_mask.reshape(H, W)
 
@@ -398,10 +398,10 @@ def predictions_to_glb(
                     )
                     mask = mask & white_bg_mask
                 if conf_percentile is not None and "conf" in predictions:
-                    #print ("Applying confidence masking...")
+                    # print ("Applying confidence masking...")
                     conf = predictions["conf"][frame_idx].reshape(-1)
                     threshold = np.percentile(conf, conf_percentile)
-                    #print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
+                    # print (f"Confidence threshold at {conf_percentile} percentile: {threshold}")
                     conf_mask = conf >= threshold
                     mask = mask & conf_mask.reshape(H, W)
                 # Create mesh for this frame

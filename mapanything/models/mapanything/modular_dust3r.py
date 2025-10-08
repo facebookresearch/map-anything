@@ -132,12 +132,12 @@ class ModularDUSt3R(nn.Module):
             self.custom_positional_encoding = None
 
         # Add dependencies to info_sharing_config
-        info_sharing_config["module_args"][
-            "input_embed_dim"
-        ] = self.encoder.enc_embed_dim
-        info_sharing_config["module_args"][
-            "custom_positional_encoding"
-        ] = self.custom_positional_encoding
+        info_sharing_config["module_args"]["input_embed_dim"] = (
+            self.encoder.enc_embed_dim
+        )
+        info_sharing_config["module_args"]["custom_positional_encoding"] = (
+            self.custom_positional_encoding
+        )
 
         # Initialize Multi-View Transformer
         if self.info_sharing_return_type == "no_intermediate_features":
@@ -195,9 +195,9 @@ class ModularDUSt3R(nn.Module):
         # Add dependencies to prediction head config
         pred_head_config["feature_head"]["patch_size"] = self.encoder.patch_size
         if self.pred_head_type == "linear":
-            pred_head_config["feature_head"][
-                "input_feature_dim"
-            ] = self.info_sharing.dim
+            pred_head_config["feature_head"]["input_feature_dim"] = (
+                self.info_sharing.dim
+            )
         elif self.pred_head_type == "dpt":
             if self.use_encoder_features_for_dpt:
                 pred_head_config["feature_head"]["input_feature_dims"] = [

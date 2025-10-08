@@ -929,16 +929,15 @@ def update_visualization(
         f"glbscene_{frame_filter.replace('.', '_').replace(':', '').replace(' ', '_')}_cam{show_cam}_mesh{show_mesh}_black{filter_black_bg}_white{filter_white_bg}.glb",
     )
 
-    
     glbscene = predictions_to_glb(
-            predictions,
-            filter_by_frames=frame_filter,
-            show_cam=show_cam,
-            mask_black_bg=filter_black_bg,
-            mask_white_bg=filter_white_bg,
-            as_mesh=show_mesh,
-            conf_percentile=conf_thres,
-        )
+        predictions,
+        filter_by_frames=frame_filter,
+        show_cam=show_cam,
+        mask_black_bg=filter_black_bg,
+        mask_white_bg=filter_white_bg,
+        as_mesh=show_mesh,
+        conf_percentile=conf_thres,
+    )
     glbscene.export(file_obj=glbfile)
 
     return (
