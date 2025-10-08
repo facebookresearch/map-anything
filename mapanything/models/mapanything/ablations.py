@@ -109,7 +109,7 @@ class MapAnythingAblations(nn.Module):
         """
         super().__init__()
 
-        # Initalize the attributes
+        # Initialize the attributes
         self.name = name
         self.encoder_config = encoder_config
         self.info_sharing_config = info_sharing_config
@@ -235,18 +235,18 @@ class MapAnythingAblations(nn.Module):
         else:
             self.custom_positional_encoding = None
 
-        # Add dependecies to info_sharing_config
-        info_sharing_config["module_args"]["input_embed_dim"] = (
-            self.encoder.enc_embed_dim
-        )
-        info_sharing_config["module_args"]["custom_positional_encoding"] = (
-            self.custom_positional_encoding
-        )
+        # Add dependencies to info_sharing_config
+        info_sharing_config["module_args"][
+            "input_embed_dim"
+        ] = self.encoder.enc_embed_dim
+        info_sharing_config["module_args"][
+            "custom_positional_encoding"
+        ] = self.custom_positional_encoding
 
         # Initialize Multi-View Transformer
         if self.info_sharing_return_type == "no_intermediate_features":
             # Returns only normalized last layer features
-            # Intialize multi-view transformer based on type
+            # Initialize multi-view transformer based on type
             if self.info_sharing_type == "cross_attention":
                 self.info_sharing = MultiViewCrossAttentionTransformer(
                     **info_sharing_config["module_args"]
@@ -316,9 +316,9 @@ class MapAnythingAblations(nn.Module):
         # Add dependencies to prediction head config
         pred_head_config["feature_head"]["patch_size"] = self.encoder.patch_size
         if self.pred_head_type == "linear":
-            pred_head_config["feature_head"]["input_feature_dim"] = (
-                self.info_sharing.dim
-            )
+            pred_head_config["feature_head"][
+                "input_feature_dim"
+            ] = self.info_sharing.dim
         elif "dpt" in self.pred_head_type:
             # Add dependencies for DPT & Regressor head
             if self.use_encoder_features_for_dpt:
@@ -335,9 +335,9 @@ class MapAnythingAblations(nn.Module):
             # Add dependencies for Pose head if required
             if "pose" in self.pred_head_type:
                 pred_head_config["pose_head"]["patch_size"] = self.encoder.patch_size
-                pred_head_config["pose_head"]["input_feature_dim"] = (
-                    self.info_sharing.dim
-                )
+                pred_head_config["pose_head"][
+                    "input_feature_dim"
+                ] = self.info_sharing.dim
         else:
             raise ValueError(
                 f"Invalid pred_head_type: {self.pred_head_type}. Valid options: ['linear', 'dpt', 'dpt+pose']"
@@ -348,7 +348,7 @@ class MapAnythingAblations(nn.Module):
             # Initialize Dense Prediction Head for all views
             self.dense_head = LinearFeature(**pred_head_config["feature_head"])
         elif "dpt" in self.pred_head_type:
-            # Initialze Dense Predction Head for all views
+            # Initialize Dense Prediction Head for all views
             self.dpt_feature_head = DPTFeature(**pred_head_config["feature_head"])
             self.dpt_regressor_head = DPTRegressionProcessor(
                 **pred_head_config["regressor_head"]
@@ -416,9 +416,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "raymap+depth+confidence+mask"
         elif pred_head_config["adaptor_type"] == "raydirs+depth+pose":
-            assert self.pred_head_type == "dpt+pose", (
-                "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = RayDirectionsPlusDepthAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -427,9 +427,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "raydirs+depth+pose"
         elif pred_head_config["adaptor_type"] == "raydirs+depth+pose+confidence":
-            assert self.pred_head_type == "dpt+pose", (
-                "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = RayDirectionsPlusDepthWithConfidenceAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -438,9 +438,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "raydirs+depth+pose+confidence"
         elif pred_head_config["adaptor_type"] == "raydirs+depth+pose+mask":
-            assert self.pred_head_type == "dpt+pose", (
-                "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = RayDirectionsPlusDepthWithMaskAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -449,9 +449,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "raydirs+depth+pose+mask"
         elif pred_head_config["adaptor_type"] == "raydirs+depth+pose+confidence+mask":
-            assert self.pred_head_type == "dpt+pose", (
-                "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = RayDirectionsPlusDepthWithConfidenceAndMaskAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -460,18 +460,18 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "raydirs+depth+pose+confidence+mask"
         elif pred_head_config["adaptor_type"] == "campointmap+pose":
-            assert self.pred_head_type == "dpt+pose", (
-                "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapAdaptor(**pred_head_config["dpt_adaptor"])
             self.pose_adaptor = CamTranslationPlusQuatsAdaptor(
                 **pred_head_config["pose_adaptor"]
             )
             self.scene_rep_type = "campointmap+pose"
         elif pred_head_config["adaptor_type"] == "campointmap+pose+confidence":
-            assert self.pred_head_type == "dpt+pose", (
-                "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapWithConfidenceAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -480,9 +480,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "campointmap+pose+confidence"
         elif pred_head_config["adaptor_type"] == "campointmap+pose+mask":
-            assert self.pred_head_type == "dpt+pose", (
-                "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapWithMaskAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -491,9 +491,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "campointmap+pose+mask"
         elif pred_head_config["adaptor_type"] == "campointmap+pose+confidence+mask":
-            assert self.pred_head_type == "dpt+pose", (
-                "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Camera pointmap + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapWithConfidenceAndMaskAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -502,9 +502,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "campointmap+pose+confidence+mask"
         elif pred_head_config["adaptor_type"] == "pointmap+raydirs+depth+pose":
-            assert self.pred_head_type == "dpt+pose", (
-                "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapPlusRayDirectionsPlusDepthAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -515,9 +515,9 @@ class MapAnythingAblations(nn.Module):
         elif (
             pred_head_config["adaptor_type"] == "pointmap+raydirs+depth+pose+confidence"
         ):
-            assert self.pred_head_type == "dpt+pose", (
-                "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = (
                 PointMapPlusRayDirectionsPlusDepthWithConfidenceAdaptor(
                     **pred_head_config["dpt_adaptor"]
@@ -528,9 +528,9 @@ class MapAnythingAblations(nn.Module):
             )
             self.scene_rep_type = "pointmap+raydirs+depth+pose+confidence"
         elif pred_head_config["adaptor_type"] == "pointmap+raydirs+depth+pose+mask":
-            assert self.pred_head_type == "dpt+pose", (
-                "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = PointMapPlusRayDirectionsPlusDepthWithMaskAdaptor(
                 **pred_head_config["dpt_adaptor"]
             )
@@ -542,9 +542,9 @@ class MapAnythingAblations(nn.Module):
             pred_head_config["adaptor_type"]
             == "pointmap+raydirs+depth+pose+confidence+mask"
         ):
-            assert self.pred_head_type == "dpt+pose", (
-                "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
-            )
+            assert (
+                self.pred_head_type == "dpt+pose"
+            ), "Pointmap + ray directions + depth + pose can only be used as scene representation with dpt + pose head."
             self.dense_adaptor = (
                 PointMapPlusRayDirectionsPlusDepthWithConfidenceAndMaskAdaptor(
                     **pred_head_config["dpt_adaptor"]
@@ -678,14 +678,17 @@ class MapAnythingAblations(nn.Module):
                 pose_trans_ref_view_0.append(cam_pose_trans)
             else:
                 per_sample_cam_input_mask[
-                    view_idx * batch_size_per_view : (view_idx + 1)
+                    view_idx
+                    * batch_size_per_view : (view_idx + 1)
                     * batch_size_per_view
                 ] = False
 
         # Initialize the pose quats and trans for all views as identity
         pose_quats_across_views = torch.tensor(
             [0.0, 0.0, 0.0, 1.0], dtype=dtype, device=device
-        ).repeat(batch_size_per_view * num_views, 1)  # (q_x, q_y, q_z, q_w)
+        ).repeat(
+            batch_size_per_view * num_views, 1
+        )  # (q_x, q_y, q_z, q_w)
         pose_trans_across_views = torch.zeros(
             (batch_size_per_view * num_views, 3), dtype=dtype, device=device
         )
@@ -752,7 +755,8 @@ class MapAnythingAblations(nn.Module):
         for view_idx in range(num_views):
             per_sample_ray_dirs_input_mask_for_curr_view = (
                 per_sample_ray_dirs_input_mask[
-                    view_idx * batch_size_per_view : (view_idx + 1)
+                    view_idx
+                    * batch_size_per_view : (view_idx + 1)
                     * batch_size_per_view
                 ]
             )
@@ -772,7 +776,8 @@ class MapAnythingAblations(nn.Module):
                 )
             else:
                 per_sample_ray_dirs_input_mask[
-                    view_idx * batch_size_per_view : (view_idx + 1)
+                    view_idx
+                    * batch_size_per_view : (view_idx + 1)
                     * batch_size_per_view
                 ] = False
             ray_dirs_list.append(ray_dirs_for_curr_view)
@@ -927,7 +932,8 @@ class MapAnythingAblations(nn.Module):
                 ] = depth_norm_factor
             else:
                 per_sample_depth_input_mask[
-                    view_idx * batch_size_per_view : (view_idx + 1)
+                    view_idx
+                    * batch_size_per_view : (view_idx + 1)
                     * batch_size_per_view
                 ] = False
             # Append the depths, depth norm factor and metric scale mask for the current view
@@ -1063,7 +1069,9 @@ class MapAnythingAblations(nn.Module):
         )  # Concatenate back to (batch_size_per_view * num_views, 3)
         pose_trans_norm_factors_across_views = pose_trans_norm_factors.unsqueeze(
             -1
-        ).repeat(num_views, 1)  # (B, ) -> (B * V, 1)
+        ).repeat(
+            num_views, 1
+        )  # (B, ) -> (B * V, 1)
 
         # Encode the pose trans
         pose_trans_features_across_views = self.cam_trans_encoder(

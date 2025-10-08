@@ -304,7 +304,7 @@ def stack(
                     either numpy arrays or PyTorch tensors.
                     OR
                     A list of sublist, where the values of sublists are PyTorch tensors
-                    or np arrrays.
+                    or np arrays.
 
     Returns:
         dict: A dictionary with the same keys as input dictionaries, but with values

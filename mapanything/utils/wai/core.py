@@ -383,7 +383,7 @@ def load_frame(
     if scene_meta is None:
         scene_meta = _load_scene_meta(scene_root / "scene_meta.json")
     frame = get_frame(scene_meta, frame_key)
-    # compact, standarized frame representation
+    # compact, standardized frame representation
     wai_frame = {}
     if load_extrinsics:
         extrinsics = get_extrinsics(

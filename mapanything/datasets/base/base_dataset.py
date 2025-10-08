@@ -164,7 +164,9 @@ class BaseDataset(EasyDataset):
             {self.split=},
             {self.seed=},
             resolutions={resolutions_str},
-            {self.transform=})""".replace("self.", "")
+            {self.transform=})""".replace(
+                "self.", ""
+            )
             .replace("\n", "")
             .replace("   ", "")
         )
@@ -186,9 +188,9 @@ class BaseDataset(EasyDataset):
         elif isinstance(resolutions, tuple):
             resolutions = [resolutions]
         elif isinstance(resolutions, list):
-            assert all(isinstance(res, tuple) for res in resolutions), (
-                f"Bad type for {resolutions=}, should be int or tuple of ints or list of tuples of ints"
-            )
+            assert all(
+                isinstance(res, tuple) for res in resolutions
+            ), f"Bad type for {resolutions=}, should be int or tuple of ints or list of tuples of ints"
         else:
             raise ValueError(
                 f"Bad type for {resolutions=}, should be int or tuple of ints or list of tuples of ints"
@@ -200,12 +202,12 @@ class BaseDataset(EasyDataset):
                 width = height = resolution
             else:
                 width, height = resolution
-            assert isinstance(width, int), (
-                f"Bad type for {width=} {type(width)=}, should be int"
-            )
-            assert isinstance(height, int), (
-                f"Bad type for {height=} {type(height)=}, should be int"
-            )
+            assert isinstance(
+                width, int
+            ), f"Bad type for {width=} {type(width)=}, should be int"
+            assert isinstance(
+                height, int
+            ), f"Bad type for {height=} {type(height)=}, should be int"
             self._resolutions.append((width, height))
 
     def _crop_resize_if_necessary(
@@ -319,7 +321,7 @@ class BaseDataset(EasyDataset):
         use_bidirectional_covis=True,
     ):
         """
-        Randomly samples S indices from an N x N covisbility matrix by forming adjacency edges such that the resulting subgraph (given by the indices) is connected.
+        Randomly samples S indices from an N x N covisibility matrix by forming adjacency edges such that the resulting subgraph (given by the indices) is connected.
         If the current node has no new unvisited neighbors, backtracking occurs.
         Retries with different starting indices if the desired number of samples is not reached, excluding previously visited components.
 
@@ -495,24 +497,24 @@ class BaseDataset(EasyDataset):
             # Check the depth, intrinsics, and pose data (also other data if present)
             assert "camera_intrinsics" in view
             assert "camera_pose" in view
-            assert np.isfinite(view["camera_pose"]).all(), (
-                f"NaN or infinite values in camera pose for view {view_name(view)}"
-            )
-            assert np.isfinite(view["depthmap"]).all(), (
-                f"NaN or infinite values in depthmap for view {view_name(view)}"
-            )
+            assert np.isfinite(
+                view["camera_pose"]
+            ).all(), f"NaN or infinite values in camera pose for view {view_name(view)}"
+            assert np.isfinite(
+                view["depthmap"]
+            ).all(), f"NaN or infinite values in depthmap for view {view_name(view)}"
             assert "valid_mask" not in view
-            assert "pts3d" not in view, (
-                f"pts3d should not be there, they will be computed afterwards based on intrinsics+depthmap for view {view_name(view)}"
-            )
+            assert (
+                "pts3d" not in view
+            ), f"pts3d should not be there, they will be computed afterwards based on intrinsics+depthmap for view {view_name(view)}"
             if "prior_depth_z" in view:
-                assert np.isfinite(view["prior_depth_z"]).all(), (
-                    f"NaN or infinite values in prior_depth_z for view {view_name(view)}"
-                )
+                assert np.isfinite(
+                    view["prior_depth_z"]
+                ).all(), f"NaN or infinite values in prior_depth_z for view {view_name(view)}"
             if "non_ambiguous_mask" in view:
-                assert np.isfinite(view["non_ambiguous_mask"]).all(), (
-                    f"NaN or infinite values in non_ambiguous_mask for view {view_name(view)}"
-                )
+                assert np.isfinite(
+                    view["non_ambiguous_mask"]
+                ).all(), f"NaN or infinite values in non_ambiguous_mask for view {view_name(view)}"
 
             # Encode the image
             width, height = view["img"].size
@@ -574,7 +576,7 @@ class BaseDataset(EasyDataset):
             if "non_ambiguous_mask" in view:
                 assert view["depthmap"].shape == view["non_ambiguous_mask"].shape
 
-            # Expand the last dimennsion of the depthmap
+            # Expand the last dimension of the depthmap
             view["depthmap"] = view["depthmap"][..., None]
 
             # Append RNG state to the views, this allows to check whether the RNG is in the same state each time
@@ -593,31 +595,31 @@ class BaseDataset(EasyDataset):
             )
 
             # Check the pointmaps, rays, depth along ray, and camera pose quaternions and translation to ensure they are finite
-            assert np.isfinite(view["pts3d"]).all(), (
-                f"NaN in pts3d for view {view_name(view)}"
-            )
-            assert np.isfinite(view["valid_mask"]).all(), (
-                f"NaN in valid_mask for view {view_name(view)}"
-            )
-            assert np.isfinite(view["depth_along_ray"]).all(), (
-                f"NaN in depth_along_ray for view {view_name(view)}"
-            )
-            assert np.isfinite(view["ray_directions_cam"]).all(), (
-                f"NaN in ray_directions_cam for view {view_name(view)}"
-            )
-            assert np.isfinite(view["pts3d_cam"]).all(), (
-                f"NaN in pts3d_cam for view {view_name(view)}"
-            )
-            assert np.isfinite(view["camera_pose_quats"]).all(), (
-                f"NaN in camera_pose_quats for view {view_name(view)}"
-            )
-            assert np.isfinite(view["camera_pose_trans"]).all(), (
-                f"NaN in camera_pose_trans for view {view_name(view)}"
-            )
+            assert np.isfinite(
+                view["pts3d"]
+            ).all(), f"NaN in pts3d for view {view_name(view)}"
+            assert np.isfinite(
+                view["valid_mask"]
+            ).all(), f"NaN in valid_mask for view {view_name(view)}"
+            assert np.isfinite(
+                view["depth_along_ray"]
+            ).all(), f"NaN in depth_along_ray for view {view_name(view)}"
+            assert np.isfinite(
+                view["ray_directions_cam"]
+            ).all(), f"NaN in ray_directions_cam for view {view_name(view)}"
+            assert np.isfinite(
+                view["pts3d_cam"]
+            ).all(), f"NaN in pts3d_cam for view {view_name(view)}"
+            assert np.isfinite(
+                view["camera_pose_quats"]
+            ).all(), f"NaN in camera_pose_quats for view {view_name(view)}"
+            assert np.isfinite(
+                view["camera_pose_trans"]
+            ).all(), f"NaN in camera_pose_trans for view {view_name(view)}"
             if "prior_depth_along_ray" in view:
-                assert np.isfinite(view["prior_depth_along_ray"]).all(), (
-                    f"NaN in prior_depth_along_ray for view {view_name(view)}"
-                )
+                assert np.isfinite(
+                    view["prior_depth_along_ray"]
+                ).all(), f"NaN in prior_depth_along_ray for view {view_name(view)}"
 
         return views
 

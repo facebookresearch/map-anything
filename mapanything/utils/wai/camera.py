@@ -35,7 +35,7 @@ CAM_STRS_TO_PARAMS = {
     # Undistortion supported by OPenCV
     "OPENCV": ["fl_x", "fl_y", "cx", "cy", "k1", "k2", "p1", "p2"],
     "OPENCV_FISHEYE": ["fl_x", "fl_y", "cx", "cy", "k1", "k2", "k3", "k4"],
-    # Unistortion supported by pycolmap
+    # Undistortion supported by pycolmap
     "FULL_OPENCV": [
         "fl_x",
         "fl_y",

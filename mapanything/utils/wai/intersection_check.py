@@ -204,7 +204,7 @@ def frustum_intersection_check(
             Defaults to True.
         chunk_size (Optional[int]): Number of chunks to split the computation into.
             Defaults to 500.
-        device (Optional[str]): Device to store exhuastive frustum intersection matrix on.
+        device (Optional[str]): Device to store exhaustive frustum intersection matrix on.
             Defaults to None.
 
     Returns:
@@ -351,7 +351,7 @@ def points_in_frustum_check(
         frustums (torch.Tensor): Bx8 batch of frustum points.
         points (torch.Tensor): BxNx3 batch of points.
         chunk_size (Optional[int]): Number of chunks to split the computation into. Defaults to None.
-        device (Optional[str]): Device to perfrom computation on. Defaults to None.
+        device (Optional[str]): Device to perform computation on. Defaults to None.
 
     Returns:
         inside (torch.Tensor): BxN batch of Booleans indicating if points are inside frustums.
@@ -404,13 +404,13 @@ def frustums_in_frustum_check(
         frustums (torch.Tensor): Bx8 batch of frustum points.
         chunk_size (Optional[int]): Number of chunks to split the computation into.
             Defaults to None.
-        device (Optional[str]): Device to store exhuastive frustum containment matrix on.
+        device (Optional[str]): Device to store exhaustive frustum containment matrix on.
             Defaults to None.
         use_double_chunking (bool): If True, use double chunking to avoid OOM errors.
             Defaults to True.
 
     Returns:
-        frustum_contained (torch.Tensor): BxB batch of Booleans indiciating if frustums are inside
+        frustum_contained (torch.Tensor): BxB batch of Booleans indicating if frustums are inside
         other frustums.
     """
     B = frustums.shape[0]

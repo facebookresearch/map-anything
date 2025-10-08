@@ -170,7 +170,7 @@ class EasyDataset:
 
 
 class MulDataset(EasyDataset):
-    """Artifically augmenting the size of a dataset."""
+    """Artificially augmenting the size of a dataset."""
 
     multiplicator: int
 
@@ -244,7 +244,7 @@ class MulDataset(EasyDataset):
 
 
 class ResizedDataset(EasyDataset):
-    """Artifically changing the size of a dataset."""
+    """Artificially changing the size of a dataset."""
 
     new_size: int
 
@@ -328,9 +328,9 @@ class ResizedDataset(EasyDataset):
         Raises:
             AssertionError: If set_epoch has not been called
         """
-        assert hasattr(self, "_idxs_mapping"), (
-            "You need to call dataset.set_epoch() to use ResizedDataset.__getitem__()"
-        )
+        assert hasattr(
+            self, "_idxs_mapping"
+        ), "You need to call dataset.set_epoch() to use ResizedDataset.__getitem__()"
         if isinstance(idx, tuple):
             other = idx[1:]
             idx = idx[0]
@@ -454,9 +454,9 @@ class CatDataset(EasyDataset):
         """
         resolutions = self.datasets[0]._resolutions
         for dataset in self.datasets[1:]:
-            assert tuple(dataset._resolutions) == tuple(resolutions), (
-                "All datasets must have the same resolutions"
-            )
+            assert tuple(dataset._resolutions) == tuple(
+                resolutions
+            ), "All datasets must have the same resolutions"
         return resolutions
 
     @property
@@ -472,7 +472,7 @@ class CatDataset(EasyDataset):
         """
         num_views = self.datasets[0].num_views
         for dataset in self.datasets[1:]:
-            assert dataset.num_views == num_views, (
-                "All datasets must have the same num_views and variable_num_views parameters"
-            )
+            assert (
+                dataset.num_views == num_views
+            ), "All datasets must have the same num_views and variable_num_views parameters"
         return num_views

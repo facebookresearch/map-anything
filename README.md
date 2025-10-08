@@ -119,7 +119,7 @@ from mapanything.utils.image import load_images
 # Get inference device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Init model - This requries internet access or the huggingface hub cache to be pre-downloaded
+# Init model - This requires internet access or the huggingface hub cache to be pre-downloaded
 # For Apache 2.0 license model, use "facebook/map-anything-apache"
 model = MapAnything.from_pretrained("facebook/map-anything").to(device)
 
@@ -185,7 +185,7 @@ from mapanything.models import MapAnything
 # Get inference device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Init model - This requries internet access or the huggingface hub cache to be pre-downloaded
+# Init model - This requires internet access or the huggingface hub cache to be pre-downloaded
 # For Apache 2.0 license model, use "facebook/map-anything-apache"
 model = MapAnything.from_pretrained("facebook/map-anything").to(device)
 ```
@@ -549,7 +549,7 @@ UniCeption & WorldAI (WAI) Data are two crucial building blocks and have been de
 
 🌍 [UniCeption](https://github.com/castacks/UniCeption/tree/main) is a library which contains modular, config-swappable components for assembling end-to-end networks.
 
-🌍 [WAI](./data_processing/README.md) is a unified data format for all things 3D, 4D & Spatial AI. It enables easy, scalable and reproducable data processing.
+🌍 [WAI](./data_processing/README.md) is a unified data format for all things 3D, 4D & Spatial AI. It enables easy, scalable and reproducible data processing.
 
 We strongly encourage the community to build on top of the tools and submit PRs! This also enables us to release stronger models (both apache and research use) as the community adds more datasets to WAI and builds on top of UniCeption/MapAnything.
 
@@ -563,7 +563,7 @@ Check out our related work which also use UniCeption & WAI:
 
 ## Acknowledgments
 
-We thank the folowing projects for their open-source code: [DUSt3R](https://github.com/naver/dust3r), [MASt3R](https://github.com/naver/mast3r), [RayDiffusion](https://github.com/jasonyzhang/RayDiffusion), [MoGe](https://github.com/microsoft/moge), [VGGSfM](https://github.com/facebookresearch/vggsfm), [VGGT](https://github.com/facebookresearch/vggt), [MaRePo](https://github.com/nianticlabs/marepo), and [DINOv2](https://github.com/facebookresearch/dinov2).
+We thank the following projects for their open-source code: [DUSt3R](https://github.com/naver/dust3r), [MASt3R](https://github.com/naver/mast3r), [RayDiffusion](https://github.com/jasonyzhang/RayDiffusion), [MoGe](https://github.com/microsoft/moge), [VGGSfM](https://github.com/facebookresearch/vggsfm), [VGGT](https://github.com/facebookresearch/vggt), [MaRePo](https://github.com/nianticlabs/marepo), and [DINOv2](https://github.com/facebookresearch/dinov2).
 
 ## Citation
 

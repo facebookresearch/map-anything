@@ -93,7 +93,7 @@ class SpringWAI(BaseDataset):
         )
         covisibility_map_name = next(
             f for f in os.listdir(covisibility_map_dir) if f.endswith(".npy")
-        )  # Assumes only npy file in directory is covisbility map
+        )  # Assumes only npy file in directory is covisibility map
         covisibility_map_path = os.path.join(
             scene_root, "covisibility", covisibility_version_key, covisibility_map_name
         )

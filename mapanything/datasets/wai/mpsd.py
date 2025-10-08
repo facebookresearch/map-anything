@@ -91,7 +91,7 @@ class MPSDWAI(BaseDataset):
         covisibility_map_dir = os.path.join(
             scene_root, "covisibility", covisibility_version_key
         )
-        # Assumes only npy file in directory is covisbility map
+        # Assumes only npy file in directory is covisibility map
         covisibility_map_name = next(
             f for f in os.listdir(covisibility_map_dir) if f.endswith(".npy")
         )

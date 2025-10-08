@@ -310,9 +310,9 @@ class LLoss(BaseCriterion):
     "L-norm loss"
 
     def forward(self, a, b, **kwargs):
-        assert a.shape == b.shape and a.ndim >= 2 and 1 <= a.shape[-1] <= 4, (
-            f"Bad shape = {a.shape}"
-        )
+        assert (
+            a.shape == b.shape and a.ndim >= 2 and 1 <= a.shape[-1] <= 4
+        ), f"Bad shape = {a.shape}"
         dist = self.distance(a, b, **kwargs)
         assert dist.ndim == a.ndim - 1  # one dimension less
         if self.reduction == "none":
@@ -466,9 +466,9 @@ class Criterion(nn.Module):
 
     def __init__(self, criterion=None):
         super().__init__()
-        assert isinstance(criterion, BaseCriterion), (
-            f"{criterion} is not a proper criterion!"
-        )
+        assert isinstance(
+            criterion, BaseCriterion
+        ), f"{criterion} is not a proper criterion!"
         self.criterion = copy(criterion)
 
     def get_name(self):
@@ -1404,9 +1404,9 @@ class Regr3D(Criterion, MultiLoss):
         n_views = len(batch)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixels as "valid" pixels
             masks = [mask | amb_mask for mask, amb_mask in zip(masks, ambiguous_masks)]
 
@@ -1504,7 +1504,7 @@ class PointsPlusScaleRegr3D(Criterion, MultiLoss):
     ):
         """
         Initialize the loss criterion for World Frame Pointmaps & Scale.
-        The predicited scene representation is always normalized w.r.t. the frame of view0.
+        The predicted scene representation is always normalized w.r.t. the frame of view0.
         Loss is applied between the predicted metric scale and the ground truth metric scale.
 
         Args:
@@ -1537,7 +1537,7 @@ class PointsPlusScaleRegr3D(Criterion, MultiLoss):
         n_views = len(batch)
 
         # Everything is normalized w.r.t. camera of view0
-        # Intialize lists to store data for all views
+        # Initialize lists to store data for all views
         # Ground truth quantities
         in_camera0 = closed_form_pose_inverse(batch[0]["camera_pose"])
         no_norm_gt_pts = []
@@ -1681,9 +1681,9 @@ class PointsPlusScaleRegr3D(Criterion, MultiLoss):
         n_views = len(batch)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixel as "valid" pixels...
             valid_masks = [
                 mask | ambig_mask
@@ -1807,9 +1807,9 @@ class NormalGMLoss(MultiLoss):
         Returns all quantities normalized.
         """
         n_views = len(batch)
-        assert n_views == 1, (
-            "Normal & Gradient Matching Loss Class only supports 1 view"
-        )
+        assert (
+            n_views == 1
+        ), "Normal & Gradient Matching Loss Class only supports 1 view"
 
         # Everything is normalized w.r.t. camera of view1
         in_camera1 = closed_form_pose_inverse(batch[0]["camera_pose"])
@@ -1877,9 +1877,9 @@ class NormalGMLoss(MultiLoss):
     def compute_loss(self, batch, preds, **kw):
         gt_pts, pred_pts, valid_masks = self.get_all_info(batch, preds, **kw)
         n_views = len(batch)
-        assert n_views == 1, (
-            "Normal & Gradient Matching Loss Class only supports 1 view"
-        )
+        assert (
+            n_views == 1
+        ), "Normal & Gradient Matching Loss Class only supports 1 view"
 
         normal_losses = []
         gradient_matching_losses = []
@@ -2042,9 +2042,10 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
         self.loss_in_log = loss_in_log
         self.flatten_across_image_only = flatten_across_image_only
         self.depth_type_for_loss = depth_type_for_loss
-        assert self.depth_type_for_loss in ["depth_along_ray", "depth_z"], (
-            "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
-        )
+        assert self.depth_type_for_loss in [
+            "depth_along_ray",
+            "depth_z",
+        ], "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
         self.cam_frame_points_loss_weight = cam_frame_points_loss_weight
         self.depth_loss_weight = depth_loss_weight
         self.ray_directions_loss_weight = ray_directions_loss_weight
@@ -2063,7 +2064,7 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
         n_views = len(batch)
 
         # Everything is normalized w.r.t. camera of view0
-        # Intialize lists to store data for all views
+        # Initialize lists to store data for all views
         # Ground truth quantities
         in_camera0 = closed_form_pose_inverse(batch[0]["camera_pose"])
         no_norm_gt_pts = []
@@ -2351,9 +2352,9 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
         ]  # List of (B,)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixel as "valid" pixels...
             valid_masks = [
                 mask | ambig_mask
@@ -2761,9 +2762,9 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
         ]  # List of (B,)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixel as "valid" pixels...
             valid_masks = [
                 mask | ambig_mask
@@ -3181,9 +3182,10 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
         self.loss_in_log = loss_in_log
         self.flatten_across_image_only = flatten_across_image_only
         self.depth_type_for_loss = depth_type_for_loss
-        assert self.depth_type_for_loss in ["depth_along_ray", "depth_z"], (
-            "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
-        )
+        assert self.depth_type_for_loss in [
+            "depth_along_ray",
+            "depth_z",
+        ], "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
         self.cam_frame_points_loss_weight = cam_frame_points_loss_weight
         self.depth_loss_weight = depth_loss_weight
         self.ray_directions_loss_weight = ray_directions_loss_weight
@@ -3481,9 +3483,9 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
         ]  # List of (B,)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixel as "valid" pixels...
             valid_masks = [
                 mask | ambig_mask
@@ -3912,9 +3914,9 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
         ]  # List of (B,)
 
         if self.ambiguous_loss_value > 0:
-            assert self.criterion.reduction == "none", (
-                "ambiguous_loss_value should be 0 if no conf loss"
-            )
+            assert (
+                self.criterion.reduction == "none"
+            ), "ambiguous_loss_value should be 0 if no conf loss"
             # Add the ambiguous pixel as "valid" pixels...
             valid_masks = [
                 mask | ambig_mask
@@ -4338,9 +4340,10 @@ class DisentangledFactoredGeometryScaleRegr3D(Criterion, MultiLoss):
         self.loss_in_log = loss_in_log
         self.flatten_across_image_only = flatten_across_image_only
         self.depth_type_for_loss = depth_type_for_loss
-        assert self.depth_type_for_loss in ["depth_along_ray", "depth_z"], (
-            "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
-        )
+        assert self.depth_type_for_loss in [
+            "depth_along_ray",
+            "depth_z",
+        ], "depth_type_for_loss must be one of ['depth_along_ray', 'depth_z']"
         self.depth_loss_weight = depth_loss_weight
         self.ray_directions_loss_weight = ray_directions_loss_weight
         self.pose_quats_loss_weight = pose_quats_loss_weight
