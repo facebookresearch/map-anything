@@ -76,7 +76,7 @@ These scripts demonstrate how our comprehensive training data and pipeline can e
 
 ### Example Fine-tuning Results
 
-We show the average performance on ETH3D, ScanNet++V2 & TartanAirV2-WB at varying number of views for our finetuned VGGT using the MapAnything data and training pipeline. Note that there might be data leak for π³ on our ScanNet++V2 & TartanAirV2-WB benchmarking since the train scene splits are unknown. Despite this, we show that our finetuned model shows higher performance than π³ (finetuned on top of VGGT):
+We show the average performance on ETH3D, ScanNet++V2 & TartanAirV2-WB at varying number of views for our finetuned variants of VGGT & π³ using the MapAnything data and training framework. Note that there might be data leak for π³ on our ScanNet++V2 & TartanAirV2-WB benchmarking since the original train scene splits are unknown. Despite this, we show that our finetuned models show higher performance than the public π³ (finetuned on top of VGGT) & VGGT models:
 
 ![Finetuning Benchmarking](./assets/finetuning_benchmarking.png)
 
