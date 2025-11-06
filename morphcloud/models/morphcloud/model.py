@@ -14,7 +14,7 @@ import os
 import warnings
 from collections import OrderedDict
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -966,24 +966,94 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         state_dict = _load_weights(weights_path)
         state_dict = cls._maybe_remap_state_dict_keys(state_dict, model)
 
+        effective_strict = strict
+        def _filter_state_dict_for_relaxed_load(
+            checkpoint_state: Dict[str, torch.Tensor]
+        ) -> Tuple[Dict[str, torch.Tensor], Dict[str, Sequence[str]]]:
+            reference_state = model.state_dict()
+            filtered_state: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+            mismatched: List[str] = []
+            unexpected: List[str] = []
+
+            for key, tensor in checkpoint_state.items():
+                if key not in reference_state:
+                    unexpected.append(key)
+                    continue
+
+                reference_tensor = reference_state[key]
+                if tensor.shape != reference_tensor.shape or tensor.dtype != reference_tensor.dtype:
+                    mismatched.append(key)
+                    continue
+
+                filtered_state[key] = tensor
+
+            missing = sorted(set(reference_state.keys()) - set(filtered_state.keys()))
+            diagnostics: Dict[str, Sequence[str]] = {
+                "missing_keys": missing,
+                "unexpected_keys": sorted(unexpected),
+                "mismatched_keys": sorted(mismatched),
+            }
+            return filtered_state, diagnostics
+
+        fallback_diagnostics: Optional[Dict[str, Sequence[str]]] = None
+
         try:
             load_result = model.load_state_dict(state_dict, strict=strict)
         except RuntimeError as exc:
-            raise RuntimeError(
-                "Failed to load pretrained weights. If you are attempting to "
-                "load a legacy MapAnything checkpoint, ensure it is compatible "
-                "with the MorphCloud architecture."
-            ) from exc
+            if strict:
+                warnings.warn(
+                    "Strict checkpoint loading failed due to incompatible keys; "
+                    "retrying with strict=False. Original error: {}".format(exc),
+                    stacklevel=2,
+                )
+                try:
+                    load_result = model.load_state_dict(state_dict, strict=False)
+                except RuntimeError as inner_exc:
+                    filtered_state_dict, fallback_diagnostics = _filter_state_dict_for_relaxed_load(
+                        state_dict
+                    )
+                    try:
+                        load_result = model.load_state_dict(filtered_state_dict, strict=False)
+                    except RuntimeError as filtered_exc:  # pragma: no cover - defensive
+                        raise RuntimeError(
+                            "Failed to load pretrained weights even after "
+                            "relaxing strictness. If you are attempting to load a "
+                            "legacy MapAnything checkpoint, ensure it is compatible "
+                            "with the MorphCloud architecture."
+                        ) from filtered_exc
+                effective_strict = False
+            else:
+                raise RuntimeError(
+                    "Failed to load pretrained weights. If you are attempting to "
+                    "load a legacy MapAnything checkpoint, ensure it is compatible "
+                    "with the MorphCloud architecture."
+                ) from exc
 
-        if not strict and hasattr(load_result, "missing_keys"):
-            missing_keys = load_result.missing_keys
-            unexpected_keys = load_result.unexpected_keys
-            if missing_keys or unexpected_keys:
+        if not effective_strict and hasattr(load_result, "missing_keys"):
+            missing_keys: Sequence[str] = load_result.missing_keys
+            unexpected_keys: Sequence[str] = load_result.unexpected_keys
+            mismatched_keys: Sequence[str] = ()
+
+            if fallback_diagnostics is not None:
+                missing_keys = sorted(
+                    set(missing_keys).union(fallback_diagnostics.get("missing_keys", ()))
+                )
+                unexpected_keys = sorted(
+                    set(unexpected_keys).union(fallback_diagnostics.get("unexpected_keys", ()))
+                )
+                mismatched_keys = tuple(fallback_diagnostics.get("mismatched_keys", ()))
+
+            if missing_keys or unexpected_keys or mismatched_keys:
+                warning_parts = [
+                    "missing keys {}".format(missing_keys),
+                    "unexpected keys {}".format(unexpected_keys),
+                ]
+                if mismatched_keys:
+                    warning_parts.append("mismatched keys {}".format(list(mismatched_keys)))
+
                 warnings.warn(
                     "Incompatible keys detected while loading pretrained "
-                    "weights: missing keys {} / unexpected keys {}.".format(
-                        missing_keys, unexpected_keys
-                    ),
+                    "weights ({}).".format(" / ".join(warning_parts)),
                     stacklevel=2,
                 )
 
