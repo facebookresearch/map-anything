@@ -6,10 +6,10 @@ defaults:
   - task: images_only
 
 # String for model factory
-model_str: "mapanything_ablations"
+model_str: "morphcloud_ablations"
 # Model config
 model_config:
-  name: "mapanything_ablations"
+  name: "morphcloud_ablations"
   encoder_config: ${model.encoder}
   info_sharing_config: ${model.info_sharing}
   pred_head_config: ${model.pred_head}

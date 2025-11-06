@@ -15,13 +15,13 @@ import numpy as np
 import rerun as rr
 from tqdm import tqdm
 
-from mapanything.utils.cropping import (
+from morphcloud.utils.cropping import (
     rescale_image_and_other_optional_info,
     resize_with_nearest_interpolation_to_match_aspect_ratio,
 )
-from mapanything.utils.misc import seed_everything
-from mapanything.utils.viz import log_posed_rgbd_data_to_rerun, script_add_rerun_args
-from mapanything.utils.wai.core import load_data, load_frame
+from morphcloud.utils.misc import seed_everything
+from morphcloud.utils.viz import log_posed_rgbd_data_to_rerun, script_add_rerun_args
+from morphcloud.utils.wai.core import load_data, load_frame
 
 
 def viz_wai_rgbd_data(

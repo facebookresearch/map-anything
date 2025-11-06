@@ -10,14 +10,14 @@ Before training, setup all the WAI format data following the [Data Processing RE
 
 ```bash
 # Verify BlendedMVS dataloader with Rerun visualization
-python mapanything/datasets/wai/blendedmvs.py \
+python morphcloud/datasets/wai/blendedmvs.py \
     --root_dir /path/to/blendedmvs \
     --dataset_metadata_dir /path/to/metadata \
     --num_of_views 4 \
     --viz
 ```
 
-See the main call in each dataloader file (e.g., `mapanything/datasets/wai/blendedmvs.py`) for more details and use `--viz` for Rerun visualization. Our dataloaders by default support varying number of views during training.
+See the main call in each dataloader file (e.g., `morphcloud/datasets/wai/blendedmvs.py`) for more details and use `--viz` for Rerun visualization. Our dataloaders by default support varying number of views during training.
 
 ## Quick Start: Single Dataset Training
 

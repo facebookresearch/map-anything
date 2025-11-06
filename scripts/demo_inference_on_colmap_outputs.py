@@ -30,11 +30,11 @@ import rerun as rr
 import torch
 from PIL import Image
 
-from mapanything.models import MapAnything
-from mapanything.utils.colmap import get_camera_matrix, qvec2rotmat, read_model
-from mapanything.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
-from mapanything.utils.image import preprocess_inputs
-from mapanything.utils.viz import predictions_to_glb, script_add_rerun_args
+from morphcloud.models import MapAnything
+from morphcloud.utils.colmap import get_camera_matrix, qvec2rotmat, read_model
+from morphcloud.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
+from morphcloud.utils.image import preprocess_inputs
+from morphcloud.utils.viz import predictions_to_glb, script_add_rerun_args
 
 
 def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
@@ -324,7 +324,7 @@ def get_parser():
     parser.add_argument(
         "--output_directory",
         type=str,
-        default="colmap_mapanything_output",
+        default="colmap_morphcloud_output",
         help="Output directory for GLB file and input images",
     )
     parser.add_argument(
@@ -414,7 +414,7 @@ def main():
         viz_string = "MapAnything_COLMAP_Inference_Visualization"
         rr.script_setup(args, viz_string)
         rr.set_time("stable_time", sequence=0)
-        rr.log("mapanything", rr.ViewCoordinates.RDF, static=True)
+        rr.log("morphcloud", rr.ViewCoordinates.RDF, static=True)
 
     # Loop through the outputs
     for view_idx, pred in enumerate(outputs):
@@ -449,8 +449,8 @@ def main():
                 intrinsics=intrinsics_torch.cpu().numpy(),
                 pts3d=pts3d_np,
                 mask=mask,
-                base_name=f"mapanything/view_{view_idx}",
-                pts_name=f"mapanything/pointcloud_view_{view_idx}",
+                base_name=f"morphcloud/view_{view_idx}",
+                pts_name=f"morphcloud/pointcloud_view_{view_idx}",
                 viz_mask=mask,
             )
 
@@ -466,7 +466,7 @@ def main():
         scene_prefix = os.path.basename(scene_output_dir)
 
         glb_output_path = os.path.join(
-            scene_output_dir, f"{scene_prefix}_mapanything_colmap_output.glb"
+            scene_output_dir, f"{scene_prefix}_morphcloud_colmap_output.glb"
         )
         print(f"Saving GLB file to: {glb_output_path}")
 

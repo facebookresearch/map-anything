@@ -13,7 +13,7 @@ from omegaconf.dictconfig import DictConfig
 from tqdm import tqdm
 
 from data_processing.wai_processing.utils.state import set_processing_state
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 logger = logging.getLogger(__name__)
 

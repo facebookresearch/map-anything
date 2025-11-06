@@ -21,17 +21,17 @@ from data_processing.wai_processing.utils.state import (
     SceneProcessLock,
     set_processing_state,
 )
-from mapanything.utils.wai.basic_dataset import BasicSceneframeDataset
-from mapanything.utils.wai.camera import intrinsics_to_fov
-from mapanything.utils.wai.core import (
+from morphcloud.utils.wai.basic_dataset import BasicSceneframeDataset
+from morphcloud.utils.wai.camera import intrinsics_to_fov
+from morphcloud.utils.wai.core import (
     get_frame,
     load_data,
     nest_modality,
     set_frame,
     store_data,
 )
-from mapanything.utils.wai.ops import resize
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.ops import resize
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 logger = logging.getLogger(__name__)

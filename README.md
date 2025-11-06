@@ -74,7 +74,7 @@ MapAnything is a simple, end-to-end trained transformer model that directly regr
 - [Benchmarking](#benchmarking)
 - [Code License](#code-license)
 - [Models](#models)
-- [Building Blocks for MapAnything](#building-blocks-for-mapanything)
+- [Building Blocks for MapAnything](#building-blocks-for-morphcloud)
 - [Acknowledgments](#acknowledgments)
 - [Citation](#citation)
 
@@ -87,8 +87,8 @@ git clone https://github.com/facebookresearch/map-anything.git
 cd map-anything
 
 # Create and activate conda environment
-conda create -n mapanything python=3.12 -y
-conda activate mapanything
+conda create -n morphcloud python=3.12 -y
+conda activate morphcloud
 
 # Optional: Install torch, torchvision & torchaudio specific to your system
 # Install MapAnything
@@ -113,8 +113,8 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Required imports
 import torch
-from mapanything.models import MapAnything
-from mapanything.utils.image import load_images
+from morphcloud.models import MapAnything
+from morphcloud.utils.image import load_images
 
 # Get inference device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -180,7 +180,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Required imports
 import torch
-from mapanything.models import MapAnything
+from morphcloud.models import MapAnything
 
 # Get inference device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -221,7 +221,7 @@ views_example = [
 
 Note that MapAnything expects the input camera poses to follow the OpenCV (+X - Right, +Y - Down, +Z - Forward) cam2world convention.
 
-<!-- TODO: We provide a helper function `mapanything.utils.geometry.convert_cam_convention` to convert from other conventions to OpenCV (see the function in [geometry utils](./mapanything/utils/geometry.py) for more details). -->
+<!-- TODO: We provide a helper function `morphcloud.utils.geometry.convert_cam_convention` to convert from other conventions to OpenCV (see the function in [geometry utils](./morphcloud/utils/geometry.py) for more details). -->
 
 <details>
 <summary>Expand to show more examples</summary>
@@ -317,7 +317,7 @@ views_example = [
 **Run model inference:**
 
 ```python
-from mapanything.utils.image import preprocess_inputs
+from morphcloud.utils.image import preprocess_inputs
 
 # Preprocess inputs to the expected format
 processed_views = preprocess_inputs(views_example)
@@ -570,7 +570,7 @@ We thank the following projects for their open-source code: [DUSt3R](https://git
 If you find our repository useful, please consider giving it a star ⭐ and citing our paper in your work:
 
 ```bibtex
-@misc{keetha2025mapanything,
+@misc{keetha2025morphcloud,
   title={{MapAnything}: Universal Feed-Forward Metric {3D} Reconstruction},
   author={Nikhil Keetha and Norman M\"{u}ller and Johannes Sch\"{o}nberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bul\`{o} and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
   note={arXiv preprint arXiv:2509.13414},

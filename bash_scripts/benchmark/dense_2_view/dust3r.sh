@@ -16,4 +16,4 @@ python3 \
     batch_size=1 \
     model=dust3r \
     amp=0 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/two_view_benchmarking/dust3r'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/two_view_benchmarking/dust3r'

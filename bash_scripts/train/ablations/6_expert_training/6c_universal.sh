@@ -16,7 +16,7 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     dataset=megatrain_13d_518_many_ar_24ipg_16g dataset.num_workers=12 \
     dataset.num_views=4 \
     loss=overall_loss \
-    model=mapanything \
+    model=morphcloud \
     model/task=aug_training \
     model.encoder.uses_torch_hub=false \
     model.encoder.gradient_checkpointing=true \
@@ -27,4 +27,4 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     train_params.warmup_epochs=10 \
     train_params.keep_freq=200 \
     train_params.max_num_of_imgs_per_gpu=24 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training_ablations/6c_universal'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/training_ablations/6c_universal'

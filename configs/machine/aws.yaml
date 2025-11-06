@@ -4,9 +4,9 @@ defaults:
 # Root directory containing all datasets
 root_data_dir: "/fsx/xrtech/data"
 # Dataset metadata directory
-mapanything_dataset_metadata_dir: "/fsx/nkeetha/mapanything_dataset_metadata"
+morphcloud_dataset_metadata_dir: "/fsx/nkeetha/morphcloud_dataset_metadata"
 # Root directory containing pretrained checkpoints for custom models
-root_pretrained_checkpoints_dir: "/fsx/nkeetha/mapanything_checkpoints"
+root_pretrained_checkpoints_dir: "/fsx/nkeetha/morphcloud_checkpoints"
 # Root directory to log experiments
 root_experiments_dir: "/fsx/nkeetha/experiments"
 # Root directory containing UniCeption pretrained checkpoints

@@ -35,4 +35,4 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     train_params.warmup_epochs=1 \
     train_params.keep_freq=20 \
     train_params.max_num_of_imgs_per_gpu=24 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training/pi3_finetuning'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/training/pi3_finetuning'

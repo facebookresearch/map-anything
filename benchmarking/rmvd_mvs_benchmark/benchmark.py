@@ -27,8 +27,8 @@ from adaptors import RMVD_MAPA_Wrapper
 from omegaconf import DictConfig, OmegaConf
 from rmvd import create_dataset, create_evaluation
 
-from mapanything.models import init_model
-from mapanything.utils.misc import StreamToLogger
+from morphcloud.models import init_model
+from morphcloud.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
 

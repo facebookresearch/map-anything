@@ -1,4 +1,4 @@
-# String for model factory (Options: "mapanything", "mapanything_ablations", "modular_dust3r", "vggt", "pi3")
+# String for model factory (Options: "morphcloud", "morphcloud_ablations", "modular_dust3r", "vggt", "pi3")
 model_str: ???
 # Model config
 model_config:

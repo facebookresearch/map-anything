@@ -16,8 +16,8 @@ from argconf import argconf_parse
 from wai_processing.utils.globals import WAI_PROC_CONFIG_PATH
 from wai_processing.utils.wrapper import convert_scenes_wrapper
 
-from mapanything.utils.wai.camera import gl2cv
-from mapanything.utils.wai.core import store_data
+from morphcloud.utils.wai.camera import gl2cv
+from morphcloud.utils.wai.core import store_data
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 

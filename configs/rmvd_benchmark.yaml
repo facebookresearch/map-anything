@@ -7,7 +7,7 @@ defaults:
 # Path Settings
 output_dir: ${hydra:run.dir}
 external_benchmark_data_root_data_dir: ${machine.external_benchmark_data_root_data_dir}
-mapanything_dataset_metadata_dir: ${machine.mapanything_dataset_metadata_dir}
+morphcloud_dataset_metadata_dir: ${machine.morphcloud_dataset_metadata_dir}
 root_pretrained_checkpoints_dir: ${machine.root_pretrained_checkpoints_dir}
 root_experiments_dir: ${machine.root_experiments_dir}
 root_uniception_pretrained_checkpoints_dir: ${machine.root_uniception_pretrained_checkpoints_dir}

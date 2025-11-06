@@ -28,7 +28,7 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     dataset=megatrain_6d_518_many_ar_48ipg_8g dataset.num_workers=12 \
     dataset.num_views=4 \
     loss=overall_loss_weigh_pm_higher \
-    model=mapanything \
+    model=morphcloud \
     model/task=aug_training \
     model.encoder.gradient_checkpointing=true \
     train_params=lower_encoder_lr \
@@ -36,4 +36,4 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     train_params.warmup_epochs=10 \
     train_params.keep_freq=40 \
     train_params.max_num_of_imgs_per_gpu=48 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_4v_6d_48ipg_8g_apache'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/training/mapa_curri_4v_6d_48ipg_8g_apache'

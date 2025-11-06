@@ -22,14 +22,14 @@ from wai_processing.utils.state import (
     set_processing_state,
 )
 
-from mapanything.utils.wai.core import (
+from morphcloud.utils.wai.core import (
     get_frame,
     load_data,
     nest_modality,
     set_frame,
     store_data,
 )
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 logger = logging.getLogger("covisibility-confidence")
 

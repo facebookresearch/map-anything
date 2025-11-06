@@ -19,8 +19,8 @@ import sys
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from mapanything.train.training import train
-from mapanything.utils.misc import StreamToLogger
+from morphcloud.train.training import train
+from morphcloud.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
 

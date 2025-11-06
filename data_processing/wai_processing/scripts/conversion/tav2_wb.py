@@ -15,7 +15,7 @@ from wai_processing.utils.wrapper import (
     get_original_scene_names,  # noqa: F401, Needed for launch_slurm.py
 )
 
-from mapanything.utils.wai.core import load_data, store_data
+from morphcloud.utils.wai.core import load_data, store_data
 
 
 def process_tav2_wb_scene(cfg, scene_name):

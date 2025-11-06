@@ -171,7 +171,7 @@ For ease of visualizing WAI format data after conversion, we provide a simple Re
 
 ```bash
 cd <path to map-anything>
-conda activate mapanything # need to use the default mapanything env
+conda activate morphcloud # need to use the default morphcloud env
 python3 data_processing/viz_data.py -h
 ```
 
@@ -335,7 +335,7 @@ Example:
 If you find our processed data, code, or repository useful, please consider giving it a star ⭐ and citing our paper in your work:
 
 ```bibtex
-@inproceedings{keetha2025mapanything,
+@inproceedings{keetha2025morphcloud,
   title={{MapAnything}: Universal Feed-Forward Metric {3D} Reconstruction},
   author={Nikhil Keetha and Norman Müller and Johannes Schönberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bulò and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
   booktitle={arXiv},

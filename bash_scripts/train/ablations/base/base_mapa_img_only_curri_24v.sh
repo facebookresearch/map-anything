@@ -16,16 +16,16 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     dataset=megatrain_13d_518_many_ar_24ipg_16g dataset.num_workers=12 \
     dataset.num_views=24 \
     loss=overall_loss \
-    model=mapanything \
+    model=morphcloud \
     model/task=images_only \
     model.encoder.uses_torch_hub=false \
     model.encoder.gradient_checkpointing=true \
     model.info_sharing.module_args.gradient_checkpointing=true \
     model.pred_head.gradient_checkpointing=true \
-    model.pretrained='${root_experiments_dir}/mapanything/training_ablations/base_mapa_img_only_curri_4v/checkpoint-best.pth' \
+    model.pretrained='${root_experiments_dir}/morphcloud/training_ablations/base_mapa_img_only_curri_4v/checkpoint-best.pth' \
     train_params=finetune_with_lower_encoder_lr \
     train_params.epochs=15 \
     train_params.warmup_epochs=1 \
     train_params.keep_freq=100 \
     train_params.max_num_of_imgs_per_gpu=24 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training_ablations/base_mapa_img_only_curri_24v'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/training_ablations/base_mapa_img_only_curri_24v'

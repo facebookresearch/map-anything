@@ -21,7 +21,7 @@ from pathlib import Path
 
 import torch
 
-from mapanything.models import MapAnything
+from morphcloud.models import MapAnything
 
 
 def parse_args():

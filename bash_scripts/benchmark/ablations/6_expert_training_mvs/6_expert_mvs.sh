@@ -33,11 +33,11 @@ for combo in "${batch_sizes_and_views[@]}"; do
         dataset.num_workers=12 \
         dataset.num_views=$num_views \
         batch_size=$batch_size \
-        model=mapanything \
+        model=morphcloud \
         model/task=mvs \
         model.encoder.uses_torch_hub=false \
-        model.pretrained='${root_experiments_dir}/mapanything/training_ablations/6a_mvs/checkpoint-best.pth' \
-        hydra.run.dir='${root_experiments_dir}/mapanything/benchmarking_ablations/dense_'"${num_views}"'_view/6_expert_mvs'
+        model.pretrained='${root_experiments_dir}/morphcloud/training_ablations/6a_mvs/checkpoint-best.pth' \
+        hydra.run.dir='${root_experiments_dir}/morphcloud/benchmarking_ablations/dense_'"${num_views}"'_view/6_expert_mvs'
 
     echo "Finished running with batch_size=$batch_size and num_views=$num_views"
 done

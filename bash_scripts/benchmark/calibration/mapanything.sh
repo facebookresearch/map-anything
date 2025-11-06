@@ -13,7 +13,7 @@ python3 \
     dataset=benchmark_sv_calib_518_many_ar_eth3d_snpp_tav2 \
     dataset.num_workers=12 \
     batch_size=20 \
-    model=mapanything \
+    model=morphcloud \
     model/task=images_only \
-    model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_48ipg_64g/checkpoint-last.pth' \
-    hydra.run.dir='${root_experiments_dir}/mapanything/calibration_benchmarking/single_view/mapanything'
+    model.pretrained='${root_experiments_dir}/morphcloud/training/mapa_curri_24v_13d_48ipg_64g/checkpoint-last.pth' \
+    hydra.run.dir='${root_experiments_dir}/morphcloud/calibration_benchmarking/single_view/morphcloud'

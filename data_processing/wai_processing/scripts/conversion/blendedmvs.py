@@ -20,7 +20,7 @@ from wai_processing.utils.wrapper import (
     get_original_scene_names,  # noqa: F401, Needed for launch_slurm.py
 )
 
-from mapanything.utils.wai.core import store_data
+from morphcloud.utils.wai.core import store_data
 
 
 def load_blendedmvs_pfm_file(file_path):

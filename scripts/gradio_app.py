@@ -24,8 +24,8 @@ import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from mapanything.utils.geometry import depthmap_to_world_frame, points_to_normals
-from mapanything.utils.hf_utils.css_and_html import (
+from morphcloud.utils.geometry import depthmap_to_world_frame, points_to_normals
+from morphcloud.utils.hf_utils.css_and_html import (
     get_acknowledgements_html,
     get_description_html,
     get_gradio_theme,
@@ -33,13 +33,13 @@ from mapanything.utils.hf_utils.css_and_html import (
     GRADIO_CSS,
     MEASURE_INSTRUCTIONS_HTML,
 )
-from mapanything.utils.hf_utils.hf_helpers import initialize_mapanything_model
-from mapanything.utils.hf_utils.viz import predictions_to_glb
-from mapanything.utils.image import load_images, rgb
+from morphcloud.utils.hf_utils.hf_helpers import initialize_morphcloud_model
+from morphcloud.utils.hf_utils.viz import predictions_to_glb
+from morphcloud.utils.image import load_images, rgb
 
 register_heif_opener()
 
-sys.path.append("mapanything/")
+sys.path.append("morphcloud/")
 
 
 def get_logo_base64():
@@ -60,10 +60,10 @@ def get_logo_base64():
 high_level_config = {
     "path": "configs/train.yaml",
     "hf_model_name": "facebook/map-anything",
-    "model_str": "mapanything",
+    "model_str": "morphcloud",
     "config_overrides": [
         "machine=aws",
-        "model=mapanything",
+        "model=morphcloud",
         "model/task=images_only",
         "model.encoder.uses_torch_hub=false",
     ],
@@ -106,7 +106,7 @@ def run_model(
 
     # Initialize model if not already done
     if model is None:
-        model = initialize_mapanything_model(high_level_config, device)
+        model = initialize_morphcloud_model(high_level_config, device)
 
     else:
         model = model.to(device)

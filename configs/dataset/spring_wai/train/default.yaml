@@ -19,7 +19,7 @@ aug_crop: 16
 transform: 'colorjitter+grayscale+gaublur'
 data_norm_type: ${model.data_norm_type}
 ROOT: ${root_data_dir}/spring
-dataset_metadata_dir: ${mapanything_dataset_metadata_dir}
+dataset_metadata_dir: ${morphcloud_dataset_metadata_dir}
 overfit_num_sets: null
 variable_num_views: ${dataset.train.variable_num_views}
 num_views: ${dataset.num_views}

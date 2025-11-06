@@ -21,9 +21,9 @@ from wai_processing.utils.mapper import DistanceToDepthConverter
 from wai_processing.utils.state import set_processing_state
 from wai_processing.utils.wrapper import convert_scenes_wrapper
 
-from mapanything.utils.wai.camera import PINHOLE_CAM_KEYS, rotate_pinhole_90degcw
-from mapanything.utils.wai.core import load_data, store_data
-from mapanything.utils.wai.scene_frame import _filter_scenes
+from morphcloud.utils.wai.camera import PINHOLE_CAM_KEYS, rotate_pinhole_90degcw
+from morphcloud.utils.wai.core import load_data, store_data
+from morphcloud.utils.wai.scene_frame import _filter_scenes
 
 MAX_UINT_16: int = np.iinfo(np.uint16).max
 RGB_IMAGE_SIZE = 704

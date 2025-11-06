@@ -13,7 +13,7 @@ Process the test datasets to WAI format before running the benchmark. See [Data 
 Verify your processed data by running the main calls of the dataloaders (use `--viz` option for Rerun visualization). For example, to visualize the dataloader outputs for ETH3D:
 
 ```bash
-python mapanything/datasets/wai/eth3d.py --viz
+python morphcloud/datasets/wai/eth3d.py --viz
 ```
 
 See the main call in each dataloader file for usage details.
@@ -41,7 +41,7 @@ All the original benchmarking bash scripts are available at:
 Update the machine configuration (your machine in `configs/machine/`) and model checkpoint paths in the respective bash scripts, then execute:
 
 ```bash
-bash bash_scripts/benchmark/calibration/mapanything.sh
+bash bash_scripts/benchmark/calibration/morphcloud.sh
 ```
 
 Results will be saved to the configured output directory.

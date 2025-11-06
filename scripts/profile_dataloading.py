@@ -17,8 +17,8 @@ import sys
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from mapanything.train.profile_dataloading import profile_dataloading
-from mapanything.utils.misc import StreamToLogger
+from morphcloud.train.profile_dataloading import profile_dataloading
+from morphcloud.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
 

@@ -18,7 +18,7 @@ import pandas as pd
 from natsort import natsorted
 from tqdm import tqdm
 
-from mapanything.datasets.utils.data_splits import (
+from morphcloud.datasets.utils.data_splits import (
     BlendedMVSSplits,
     DL3DV10KSplits,
     ETH3DSplits,
@@ -28,8 +28,8 @@ from mapanything.datasets.utils.data_splits import (
     SpringSplits,
     TartanAirV2Splits,
 )
-from mapanything.utils.misc import seed_everything
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.misc import seed_everything
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 
 def save_scene_lists(scene_list, output_path):
@@ -537,7 +537,7 @@ def main():
         "--output_dir",
         type=str,
         help="Path to the output directory",
-        default="/fsx/nkeetha/mapanything_dataset_metadata",
+        default="/fsx/nkeetha/morphcloud_dataset_metadata",
     )
     parser.add_argument(
         "--datasets",

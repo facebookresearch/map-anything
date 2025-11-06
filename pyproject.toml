@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mapanything"
+name = "morphcloud"
 version = "1.0"
 description = "Universal Feed-Forward Metric 3D Reconstruction"
 readme = "readme.md"
@@ -49,27 +49,27 @@ rmvd = ["rmvd @ git+https://github.com/infinity1096/robustmvd.git@master#egg=rmv
 
 # Install all optional dependencies
 all = [
-    "mapanything[anycalib]",
-    "mapanything[colmap]",
-    "mapanything[data]",
-    "mapanything[dev]",
-    "mapanything[dust3r]",
-    "mapanything[gradio]",
-    "mapanything[mast3r]",
-    "mapanything[must3r]",
-    "mapanything[pow3r]",
-    "mapanything[radio]",
-    "mapanything[rmvd]",
+    "morphcloud[anycalib]",
+    "morphcloud[colmap]",
+    "morphcloud[data]",
+    "morphcloud[dev]",
+    "morphcloud[dust3r]",
+    "morphcloud[gradio]",
+    "morphcloud[mast3r]",
+    "morphcloud[must3r]",
+    "morphcloud[pow3r]",
+    "morphcloud[radio]",
+    "morphcloud[rmvd]",
 ]
 
 # Setuptools configuration
 [tool.setuptools]
 # Disable automatic package discovery to avoid conflicts
-packages = ["mapanything"]
+packages = ["morphcloud"]
 
 # Include package data
 [tool.setuptools.package-data]
-"mapanything" = ["**/*"]
+"morphcloud" = ["**/*"]
 
 # Ruff for linting
 [tool.ruff]
@@ -85,4 +85,4 @@ case-sensitive = false
 combine-as-imports = true
 detect-same-package = false
 order-by-type = false
-known-first-party = ["mapanything", "uniception"]
+known-first-party = ["morphcloud", "uniception"]

@@ -15,4 +15,4 @@ python3 \
     dataset.num_views=2 \
     batch_size=10 \
     model=pi3 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/two_view_benchmarking/pi3'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/two_view_benchmarking/pi3'

@@ -21,8 +21,8 @@ from wai_processing.utils.covis_utils import (
 )
 from wai_processing.utils.state import SceneProcessLock, set_processing_state
 
-from mapanything.utils.wai.core import load_data, store_data
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.core import load_data, store_data
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 

@@ -14,7 +14,7 @@ Before running the benchmark, process the test datasets to WAI format. See [Data
 Verify your processed data by running the main calls of the dataloaders (use `--viz` option for Rerun visualization). For example, to visualize the dataloader outputs for ETH3D:
 
 ```bash
-python mapanything/datasets/wai/eth3d.py --viz
+python morphcloud/datasets/wai/eth3d.py --viz
 ```
 
 See the main call in each dataloader file for usage details.

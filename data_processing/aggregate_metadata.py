@@ -16,9 +16,9 @@ from typing import List, Optional, Set, Union
 import numpy as np
 from natsort import natsorted
 
-from mapanything.utils.misc import seed_everything
-from mapanything.utils.parallel import parallel_processes
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.misc import seed_everything
+from morphcloud.utils.parallel import parallel_processes
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 
 def load_overlap_data(scene_folder, covisibility_version_key):

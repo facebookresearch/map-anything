@@ -12,13 +12,13 @@ from einops import einsum, repeat
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from mapanything.utils.wai.basic_dataset import BasicSceneframeDataset
-from mapanything.utils.wai.intersection_check import (
+from morphcloud.utils.wai.basic_dataset import BasicSceneframeDataset
+from morphcloud.utils.wai.intersection_check import (
     create_frustum_from_intrinsics,
     frustum_intersection_check,
 )
-from mapanything.utils.wai.m_ops import in_image, m_dot, m_project, m_unproject
-from mapanything.utils.wai.ops import resize
+from morphcloud.utils.wai.m_ops import in_image, m_dot, m_project, m_unproject
+from morphcloud.utils.wai.ops import resize
 
 logger = logging.getLogger("covis_utils")
 

@@ -35,7 +35,7 @@ for combo in "${batch_sizes_and_views[@]}"; do
         batch_size=$batch_size \
         model=dust3r \
         amp=0 \
-        hydra.run.dir='${root_experiments_dir}/mapanything/benchmarking/dense_'"${num_views}"'_view/dust3r'
+        hydra.run.dir='${root_experiments_dir}/morphcloud/benchmarking/dense_'"${num_views}"'_view/dust3r'
 
     echo "Finished running $dataset with batch_size=$batch_size and num_views=$num_views"
 done

@@ -19,7 +19,7 @@ seed: 777
 transform: 'imgnorm'
 data_norm_type: ${model.data_norm_type}
 ROOT: ${root_data_dir}/sailvos3d
-dataset_metadata_dir: ${mapanything_dataset_metadata_dir}
+dataset_metadata_dir: ${morphcloud_dataset_metadata_dir}
 overfit_num_sets: null
 variable_num_views: ${dataset.val.variable_num_views}
 num_views: ${dataset.num_views}

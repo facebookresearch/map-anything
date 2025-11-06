@@ -20,12 +20,12 @@ import torch
 import torch.backends.cudnn as cudnn
 from omegaconf import DictConfig, OmegaConf
 
-from mapanything.datasets import get_test_many_ar_data_loader
-from mapanything.models import init_model
-from mapanything.utils.metrics import (
+from morphcloud.datasets import get_test_many_ar_data_loader
+from morphcloud.models import init_model
+from morphcloud.utils.metrics import (
     l2_distance_of_unit_ray_directions_to_angular_error,
 )
-from mapanything.utils.misc import StreamToLogger
+from morphcloud.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
 

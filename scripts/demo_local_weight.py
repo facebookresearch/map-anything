@@ -20,17 +20,17 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import numpy as np
 import torch
 
-from mapanything.utils.geometry import depthmap_to_world_frame
-from mapanything.utils.hf_utils.hf_helpers import initialize_mapanything_local
-from mapanything.utils.image import load_images
-from mapanything.utils.viz import predictions_to_glb
+from morphcloud.utils.geometry import depthmap_to_world_frame
+from morphcloud.utils.hf_utils.hf_helpers import initialize_morphcloud_local
+from morphcloud.utils.image import load_images
+from morphcloud.utils.viz import predictions_to_glb
 
 LOCAL_CONFIG = {
     "path": "configs/train.yaml",
-    "model_str": "mapanything",
+    "model_str": "morphcloud",
     "config_overrides": [
         "machine=aws",
-        "model=mapanything",
+        "model=morphcloud",
         "model/task=images_only",
         "model.encoder.uses_torch_hub=false",
     ],
@@ -71,7 +71,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output_path",
         type=str,
-        default="mapanything.glb",
+        default="morphcloud.glb",
         help="Output path for GLB file",
     )
     parser.add_argument(
@@ -93,7 +93,7 @@ def main() -> None:
     print(
         f"Initializing MapAnything model from local weights with config: {args.local_config}"
     )
-    model = initialize_mapanything_local(args.local_config, device)
+    model = initialize_morphcloud_local(args.local_config, device)
     print("Successfully loaded pretrained weights")
 
     print(f"Loading images from: {args.image_folder}")

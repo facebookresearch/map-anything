@@ -16,10 +16,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from wai_processing.utils.state import SceneProcessLock, set_processing_state
 
-from mapanything.utils.wai.basic_dataset import BasicSceneframeDataset
-from mapanything.utils.wai.camera import DISTORTION_PARAM_KEYS
-from mapanything.utils.wai.core import get_frame, load_data, set_frame, store_data
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.basic_dataset import BasicSceneframeDataset
+from morphcloud.utils.wai.camera import DISTORTION_PARAM_KEYS
+from morphcloud.utils.wai.core import get_frame, load_data, set_frame, store_data
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 logger = getLogger(__name__)
 

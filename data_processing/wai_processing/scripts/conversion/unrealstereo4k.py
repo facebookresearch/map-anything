@@ -16,7 +16,7 @@ from wai_processing.utils.wrapper import (
     get_original_scene_names,  # noqa: F401, Needed for launch_slurm.py
 )
 
-from mapanything.utils.wai.core import store_data
+from morphcloud.utils.wai.core import store_data
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 

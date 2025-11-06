@@ -28,7 +28,7 @@ from wai_processing.utils.globals import (
 )
 from wai_processing.utils.state import get_commit_hash
 
-from mapanything.utils.wai.scene_frame import get_scene_names
+from morphcloud.utils.wai.scene_frame import get_scene_names
 
 ## Set up basic logging
 logging.basicConfig(

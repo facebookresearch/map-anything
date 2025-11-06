@@ -29,7 +29,7 @@ for task in "${tasks[@]}"; do
         batch_size=10 \
         model=pow3r \
         model/task=$task \
-        hydra.run.dir='${root_experiments_dir}/mapanything/two_view_benchmarking/pow3r_'"${task}"''
+        hydra.run.dir='${root_experiments_dir}/morphcloud/two_view_benchmarking/pow3r_'"${task}"''
 
     echo "Finished running with task=$task"
 done

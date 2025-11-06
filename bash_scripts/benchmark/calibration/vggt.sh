@@ -14,4 +14,4 @@ python3 \
     dataset.num_workers=12 \
     batch_size=20 \
     model=vggt \
-    hydra.run.dir='${root_experiments_dir}/mapanything/calibration_benchmarking/single_view/vggt'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/calibration_benchmarking/single_view/vggt'

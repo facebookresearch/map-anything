@@ -14,7 +14,7 @@ import pkg_resources
 import portalocker
 from portalocker.exceptions import LockException
 
-from mapanything.utils.wai.io import _store_readable, get_processing_state
+from morphcloud.utils.wai.io import _store_readable, get_processing_state
 
 logger = logging.getLogger(__name__)
 

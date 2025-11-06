@@ -17,9 +17,9 @@ from wai_processing.utils.wrapper import (
     get_original_scene_names,  # noqa: F401, Needed for launch_slurm.py
 )
 
-from mapanything.utils.wai.camera import CAMERA_KEYS, gl2cv
-from mapanything.utils.wai.core import load_data, store_data
-from mapanything.utils.wai.semantics import INVALID_ID, load_semantic_color_mapping
+from morphcloud.utils.wai.camera import CAMERA_KEYS, gl2cv
+from morphcloud.utils.wai.core import load_data, store_data
+from morphcloud.utils.wai.semantics import INVALID_ID, load_semantic_color_mapping
 
 logger = logging.getLogger(__name__)
 

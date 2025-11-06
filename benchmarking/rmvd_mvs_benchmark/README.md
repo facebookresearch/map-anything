@@ -37,9 +37,9 @@ python scripts/convert_hf_to_benchmark_checkpoint.py \
 
    ```python
    def get_model_settings(model: str, dataset: str):
-       if model == "mapanything":
+       if model == "morphcloud":
            return {
-               "model": "mapanything",
+               "model": "morphcloud",
                "model.pretrained": "/path/to/your/converted/checkpoint.pth",  # Update this path (can be any checkpoint from training or the above generated checkpoints)
                "evaluation_resolution": "\\${dataset.resolution_options.518_1_33_ar}"
                if dataset != "kitti"
@@ -52,4 +52,4 @@ python scripts/convert_hf_to_benchmark_checkpoint.py \
    python bash_scripts/benchmark/rmvd_mvs_benchmark/generate_benchmark_scripts.py
    ```
 
-4. **Run benchmarks**: Execute the generated shell scripts. Each shell file corresponds to one number in the RobustMVD table of the paper. You will find the output in `outputs/mapanything/benchmarking`.
+4. **Run benchmarks**: Execute the generated shell scripts. Each shell file corresponds to one number in the RobustMVD table of the paper. You will find the output in `outputs/morphcloud/benchmarking`.

@@ -1,7 +1,7 @@
 # Root directory containing all datasets
 root_data_dir: ???
 # Dataset metadata directory
-mapanything_dataset_metadata_dir: ???
+morphcloud_dataset_metadata_dir: ???
 # Root directory containing pretrained checkpoints for custom models
 root_pretrained_checkpoints_dir: ???
 # Root directory to log experiments

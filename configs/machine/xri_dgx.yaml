@@ -4,12 +4,12 @@ defaults:
 # Root directory containing all datasets
 root_data_dir: "/mnt/xri_mapsresearch/data/nkeetha"
 # Dataset metadata directory
-mapanything_dataset_metadata_dir: "/mnt/xri_mapsresearch/data/nkeetha/mapanything_dataset_metadata"
+morphcloud_dataset_metadata_dir: "/mnt/xri_mapsresearch/data/nkeetha/morphcloud_dataset_metadata"
 # Root directory containing pretrained checkpoints for custom models
-root_pretrained_checkpoints_dir: "/mnt/xri_mapsresearch/code/nkeetha/mapanything/checkpoints"
+root_pretrained_checkpoints_dir: "/mnt/xri_mapsresearch/code/nkeetha/morphcloud/checkpoints"
 # Root directory to log experiments
 root_experiments_dir: "/mnt/xri_mapsresearch/experiments/nkeetha"
 # Root directory containing UniCeption pretrained checkpoints
-root_uniception_pretrained_checkpoints_dir: "/mnt/xri_mapsresearch/code/nkeetha/mapanything/UniCeption/checkpoints"
+root_uniception_pretrained_checkpoints_dir: "/mnt/xri_mapsresearch/code/nkeetha/morphcloud/UniCeption/checkpoints"
 # Root directory containing external benchmark data
 external_benchmark_data_root_data_dir: "/mnt/xri_mapsresearch/data/nkeetha/rmvd_mvs_benchmark/rmvd_test_data"

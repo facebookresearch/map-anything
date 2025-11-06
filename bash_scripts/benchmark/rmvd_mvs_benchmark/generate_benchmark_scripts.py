@@ -14,10 +14,10 @@ self_folder = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_model_settings(model: str, dataset: str):
-    if model == "mapanything":
+    if model == "morphcloud":
         return {
-            "model": "mapanything",
-            "model.pretrained": "\\${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_48ipg_64g/checkpoint-last.pth",
+            "model": "morphcloud",
+            "model.pretrained": "\\${root_experiments_dir}/morphcloud/training/mapa_curri_24v_13d_48ipg_64g/checkpoint-last.pth",
             "evaluation_resolution": "\\${dataset.resolution_options.518_1_33_ar}"
             if dataset != "kitti"
             else "\\${dataset.resolution_options.518_3_20_ar}",
@@ -57,7 +57,7 @@ def get_model_settings(model: str, dataset: str):
 
 
 def generate_shell_for_single_experiment(
-    model: str = "mapanything",
+    model: str = "morphcloud",
     dataset: str = "eth3d",
     conditioning: str = "image",
     alignment: str = "none",
@@ -69,7 +69,7 @@ def generate_shell_for_single_experiment(
         "evaluation_conditioning": conditioning,
         "evaluation_alignment": alignment,
         "evaluation_views": view,
-        "hydra.run.dir": '"\${root_experiments_dir}/mapanything/benchmarking/rmvd_'
+        "hydra.run.dir": '"\${root_experiments_dir}/morphcloud/benchmarking/rmvd_'
         + f'{conditioning}_{alignment}_{view}/{dataset}/{model}"',
     }
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     # generate single view metric experiments
     for dataset in ["kitti", "scannet"]:
         # non-conditioned
-        for model in ["moge_2", "mapanything"]:
+        for model in ["moge_2", "morphcloud"]:
             generate_shell_for_single_experiment(
                 model=model,
                 dataset=dataset,
@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
         # conditioned on intrinsics
         generate_shell_for_single_experiment(
-            model="mapanything",
+            model="morphcloud",
             dataset=dataset,
             conditioning="image+intrinsics",
             alignment="none",
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     # generate multi view metric experiments
     for dataset in ["kitti", "scannet"]:
         # non-conditioned
-        for model in ["mapanything", "must3r"]:
+        for model in ["morphcloud", "must3r"]:
             generate_shell_for_single_experiment(
                 model=model,
                 dataset=dataset,
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
         # conditioned on intrinsics
         generate_shell_for_single_experiment(
-            model="mapanything",
+            model="morphcloud",
             dataset=dataset,
             conditioning="image+intrinsics",
             alignment="none",
@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
         # conditioned on intrinsics and pose
         generate_shell_for_single_experiment(
-            model="mapanything",
+            model="morphcloud",
             dataset=dataset,
             conditioning="image+intrinsics+pose",
             alignment="none",
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             "moge_1",
             "moge_2",
             "vggt",
-            "mapanything",
+            "morphcloud",
         ]:
             generate_shell_for_single_experiment(
                 model=model,
@@ -175,7 +175,7 @@ if __name__ == "__main__":
 
         # conditioned on intrinsics
         generate_shell_for_single_experiment(
-            model="mapanything",
+            model="morphcloud",
             dataset=dataset,
             conditioning="image+intrinsics",
             alignment="median",
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     # generate multi view with alignment experiments
     for dataset in ["kitti", "scannet"]:
         # non-conditioned
-        for model in ["vggt", "mapanything", "must3r"]:
+        for model in ["vggt", "morphcloud", "must3r"]:
             generate_shell_for_single_experiment(
                 model=model,
                 dataset=dataset,
@@ -196,7 +196,7 @@ if __name__ == "__main__":
 
         # conditioned on intrinsics
         generate_shell_for_single_experiment(
-            model="mapanything",
+            model="morphcloud",
             dataset=dataset,
             conditioning="image+intrinsics",
             alignment="median",

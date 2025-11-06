@@ -24,16 +24,16 @@ import trimesh
 from PIL import Image
 from torchvision import transforms as tvf
 
-from mapanything.models import MapAnything
-from mapanything.third_party.np_to_pycolmap import (
+from morphcloud.models import MapAnything
+from morphcloud.third_party.np_to_pycolmap import (
     batch_np_matrix_to_pycolmap,
     batch_np_matrix_to_pycolmap_wo_track,
 )
-from mapanything.third_party.track_predict import predict_tracks
-from mapanything.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
-from mapanything.utils.image import rgb
-from mapanything.utils.misc import seed_everything
-from mapanything.utils.viz import predictions_to_glb
+from morphcloud.third_party.track_predict import predict_tracks
+from morphcloud.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
+from morphcloud.utils.image import rgb
+from morphcloud.utils.misc import seed_everything
+from morphcloud.utils.viz import predictions_to_glb
 from uniception.models.encoders.image_normalizations import IMAGE_NORMALIZATION_DICT
 
 # Configure CUDA settings
@@ -269,7 +269,7 @@ def create_pixel_coordinate_grid(num_frames, height, width):
     return points_xyf
 
 
-def run_mapanything(
+def run_morphcloud(
     model,
     images,
     dtype,
@@ -398,7 +398,7 @@ def demo_fn(args):
 
     # Load images and original coordinates
     # Load Image in 1024, while running MapAnything with 518
-    mapanything_fixed_resolution = 518
+    morphcloud_fixed_resolution = 518
     img_load_resolution = 1024
 
     images, original_coords = load_and_preprocess_images_square(
@@ -411,11 +411,11 @@ def demo_fn(args):
     # Run MapAnything to estimate camera and depth
     # Run with 518 x 518 images
     extrinsic, intrinsic, depth_map, depth_conf, points_3d, img_no_norm, masks = (
-        run_mapanything(
+        run_morphcloud(
             model,
             images,
             dtype,
-            mapanything_fixed_resolution,
+            morphcloud_fixed_resolution,
             model.encoder.data_norm_type,
             memory_efficient_inference=args.memory_efficient_inference,
         )
@@ -437,7 +437,7 @@ def demo_fn(args):
 
     if args.use_ba:
         image_size = np.array(images.shape[-2:])
-        scale = img_load_resolution / mapanything_fixed_resolution
+        scale = img_load_resolution / morphcloud_fixed_resolution
         shared_camera = args.shared_camera
 
         with torch.amp.autocast("cuda", dtype=dtype):
@@ -496,14 +496,14 @@ def demo_fn(args):
         )
 
         image_size = np.array(
-            [mapanything_fixed_resolution, mapanything_fixed_resolution]
+            [morphcloud_fixed_resolution, morphcloud_fixed_resolution]
         )
         num_frames, height, width, _ = points_3d.shape
 
         # Denormalize images before computing RGB values
         points_rgb_images = F.interpolate(
             images,
-            size=(mapanything_fixed_resolution, mapanything_fixed_resolution),
+            size=(morphcloud_fixed_resolution, morphcloud_fixed_resolution),
             mode="bilinear",
             align_corners=False,
         )
@@ -542,7 +542,7 @@ def demo_fn(args):
             camera_type=camera_type,
         )
 
-        reconstruction_resolution = mapanything_fixed_resolution
+        reconstruction_resolution = morphcloud_fixed_resolution
 
     reconstruction = rename_colmap_recons_and_rescale_camera(
         reconstruction,

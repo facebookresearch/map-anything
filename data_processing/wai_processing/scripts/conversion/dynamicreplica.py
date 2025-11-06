@@ -17,8 +17,8 @@ from tqdm import tqdm
 from wai_processing.utils.globals import WAI_PROC_CONFIG_PATH
 from wai_processing.utils.wrapper import convert_scenes_wrapper
 
-from mapanything.utils.wai.core import store_data
-from mapanything.utils.wai.scene_frame import _filter_scenes
+from morphcloud.utils.wai.core import store_data
+from morphcloud.utils.wai.scene_frame import _filter_scenes
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 

@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation as R
 
-from mapanything.utils.geometry import get_rays_in_camera_frame
+from morphcloud.utils.geometry import get_rays_in_camera_frame
 from uniception.models.encoders.image_normalizations import IMAGE_NORMALIZATION_DICT
 
 

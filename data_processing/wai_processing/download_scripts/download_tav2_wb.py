@@ -26,7 +26,7 @@ from wai_processing.utils.distributed_h5 import (
 )
 from wai_processing.utils.parallel import parallel_threads
 
-from mapanything.utils.wai.core import store_data
+from morphcloud.utils.wai.core import store_data
 
 
 def download_file(client, bucket_name, obj, destination_folder):

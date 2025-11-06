@@ -21,16 +21,16 @@ from data_processing.wai_processing.utils.state import (
     SceneProcessLock,
     set_processing_state,
 )
-from mapanything.utils.wai.camera import ALL_CAM_PARAMS, cv2gl
-from mapanything.utils.wai.core import (
+from morphcloud.utils.wai.camera import ALL_CAM_PARAMS, cv2gl
+from morphcloud.utils.wai.core import (
     get_frame,
     load_data,
     load_frame,
     set_frame,
     store_data,
 )
-from mapanything.utils.wai.ops import to_dtype_device, to_torch_device_contiguous
-from mapanything.utils.wai.scene_frame import get_scene_frame_names
+from morphcloud.utils.wai.ops import to_dtype_device, to_torch_device_contiguous
+from morphcloud.utils.wai.scene_frame import get_scene_frame_names
 
 logger = logging.getLogger(__name__)
 

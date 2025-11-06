@@ -15,4 +15,4 @@ python3 \
     batch_size=20 \
     model=anycalib \
     amp=0 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/calibration_benchmarking/single_view/anycalib'
+    hydra.run.dir='${root_experiments_dir}/morphcloud/calibration_benchmarking/single_view/anycalib'

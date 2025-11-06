@@ -20,16 +20,16 @@ import torch
 import torch.backends.cudnn as cudnn
 from omegaconf import DictConfig, OmegaConf
 
-from mapanything.datasets import get_test_data_loader
-from mapanything.models import init_model
-from mapanything.utils.geometry import (
+from morphcloud.datasets import get_test_data_loader
+from morphcloud.models import init_model
+from morphcloud.utils.geometry import (
     geotrf,
     inv,
     normalize_multiple_pointclouds,
     quaternion_to_rotation_matrix,
     transform_pose_using_quats_and_trans_2_to_1,
 )
-from mapanything.utils.metrics import (
+from morphcloud.utils.metrics import (
     calculate_auc_np,
     evaluate_ate,
     l2_distance_of_unit_ray_directions_to_angular_error,
@@ -37,7 +37,7 @@ from mapanything.utils.metrics import (
     se3_to_relative_pose_error,
     thresh_inliers,
 )
-from mapanything.utils.misc import StreamToLogger
+from morphcloud.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
 
