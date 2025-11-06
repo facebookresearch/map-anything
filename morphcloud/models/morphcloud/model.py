@@ -12,6 +12,7 @@ import json
 import math
 import os
 import warnings
+from collections import OrderedDict
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
@@ -772,17 +773,15 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         except (TypeError, ValueError):  # pragma: no cover - defensive fallback
             supports_trust_remote_code = False
 
-        if supports_trust_remote_code:
-            if kwargs.get("trust_remote_code") is None:
-                kwargs["trust_remote_code"] = False
-            return mixin_from_pretrained.__func__(
-                cls, pretrained_model_name_or_path, *model_args, **kwargs
+        if supports_trust_remote_code and kwargs.get("trust_remote_code"):
+            warnings.warn(
+                "MorphCloud.from_pretrained always uses the local implementation; "
+                "ignoring trust_remote_code=True.",
+                stacklevel=2,
             )
 
-        # Older huggingface_hub versions do not expose the ``trust_remote_code``
-        # argument and would silently execute remote modules. Mirror the hub's
-        # behaviour locally so that we always instantiate this repository's
-        # MorphCloud implementation.
+        # Always prefer the local loading path so we can remap historical
+        # MapAnything checkpoints onto the renamed MorphCloud modules.
         kwargs.pop("trust_remote_code", None)
         return cls._from_pretrained_without_remote(
             pretrained_model_name_or_path, *model_args, **kwargs
@@ -965,12 +964,94 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             )
 
         state_dict = _load_weights(weights_path)
-        model.load_state_dict(state_dict, strict=strict)
+        state_dict = cls._maybe_remap_state_dict_keys(state_dict, model)
+
+        try:
+            load_result = model.load_state_dict(state_dict, strict=strict)
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Failed to load pretrained weights. If you are attempting to "
+                "load a legacy MapAnything checkpoint, ensure it is compatible "
+                "with the MorphCloud architecture."
+            ) from exc
+
+        if not strict and hasattr(load_result, "missing_keys"):
+            missing_keys = load_result.missing_keys
+            unexpected_keys = load_result.unexpected_keys
+            if missing_keys or unexpected_keys:
+                warnings.warn(
+                    "Incompatible keys detected while loading pretrained "
+                    "weights: missing keys {} / unexpected keys {}.".format(
+                        missing_keys, unexpected_keys
+                    ),
+                    stacklevel=2,
+                )
 
         if torch_dtype is not None:
             model = model.to(dtype=torch_dtype)
 
         return model
+
+    @staticmethod
+    def _maybe_remap_state_dict_keys(
+        state_dict: Dict[str, torch.Tensor], model: nn.Module
+    ) -> Dict[str, torch.Tensor]:
+        """Adapt MapAnything checkpoints to the MorphCloud namespace when possible."""
+
+        if not isinstance(state_dict, dict):
+            return state_dict
+
+        reference_state = model.state_dict()
+        reference_keys = list(reference_state.keys())
+        reference_key_set = set(reference_keys)
+
+        if set(state_dict.keys()) == reference_key_set:
+            return state_dict
+
+        prefix_sequences = [
+            (),
+            ("model.",),
+            ("module.",),
+            ("module.", "model."),
+            ("model.", "module."),
+        ]
+
+        def _apply_transforms(
+            prefixes: Tuple[str, ...], replace_namespace: bool
+        ) -> Optional[Dict[str, torch.Tensor]]:
+            remapped: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+            for key, value in state_dict.items():
+                new_key = key
+                for prefix in prefixes:
+                    if new_key.startswith(prefix):
+                        new_key = new_key[len(prefix) :]
+                if replace_namespace and "mapanything" in new_key:
+                    new_key = new_key.replace("mapanything", "morphcloud")
+                if new_key in remapped:
+                    return None
+                remapped[new_key] = value
+
+            if set(remapped.keys()) != reference_key_set:
+                return None
+
+            ordered: "OrderedDict[str, torch.Tensor]" = OrderedDict()
+            for ref_key in reference_keys:
+                ordered[ref_key] = remapped[ref_key]
+            return ordered
+
+        for replace_namespace in (False, True):
+            for prefixes in prefix_sequences:
+                remapped_state = _apply_transforms(prefixes, replace_namespace)
+                if remapped_state is not None:
+                    if replace_namespace or prefixes:
+                        warnings.warn(
+                            "Remapped pretrained checkpoint keys to match the "
+                            "MorphCloud module namespace.",
+                            stacklevel=2,
+                        )
+                    return remapped_state
+
+        return state_dict
 
     @staticmethod
     def _extract_model_init_args(config_data: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
