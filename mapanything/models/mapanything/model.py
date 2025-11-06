@@ -7,9 +7,10 @@
 MapAnything model class defined using UniCeption modules.
 """
 
+import math
 import warnings
 from functools import partial
-from typing import Any, Callable, Dict, List, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -638,11 +639,110 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             image=all_imgs_across_views, data_norm_type=data_norm_type
         )
         encoder_output = self.encoder(encoder_input)
-        all_encoder_features_across_views = encoder_output.features.chunk(
+        all_encoder_features_across_views = encoder_output.features
+
+        # Add time index positional encoding to each token before splitting views
+        time_index_features = self._compute_time_index_features(
+            views, all_encoder_features_across_views
+        )
+        if time_index_features is not None:
+            all_encoder_features_across_views = (
+                all_encoder_features_across_views
+                + time_index_features.unsqueeze(-1).unsqueeze(-1)
+            )
+
+        all_encoder_features_across_views = all_encoder_features_across_views.chunk(
             num_views, dim=0
         )
 
         return all_encoder_features_across_views
+
+    def _compute_time_index_features(
+        self,
+        views: List[Dict[str, Any]],
+        encoder_features: torch.Tensor,
+    ) -> Optional[torch.Tensor]:
+        """Compute sinusoidal time index encoding for each view batch.
+
+        Args:
+            views: List of dictionaries containing view inputs.
+            encoder_features: Encoded image features with shape (B * V, C, H, W).
+
+        Returns:
+            Tensor of shape (B * V, C) representing the time encoding to be added
+            to every token. Returns None when no time indices are provided and the
+            encoding is all zeros.
+        """
+
+        device = encoder_features.device
+        dtype = encoder_features.dtype
+        embed_dim = encoder_features.shape[1]
+
+        if embed_dim == 0:
+            return None
+
+        time_indices_per_view: List[torch.Tensor] = []
+
+        for view in views:
+            batch_size = view["img"].shape[0]
+            time_index_value = view.get("time_index", None)
+
+            if time_index_value is None:
+                time_index_tensor = torch.zeros(
+                    batch_size, device=device, dtype=dtype
+                )
+            else:
+                if torch.is_tensor(time_index_value):
+                    time_index_tensor = time_index_value
+                else:
+                    time_index_tensor = torch.as_tensor(time_index_value)
+
+                if time_index_tensor.ndim == 0:
+                    time_index_tensor = time_index_tensor.expand(batch_size)
+                elif time_index_tensor.ndim == 1 and time_index_tensor.shape[0] == 1:
+                    time_index_tensor = time_index_tensor.expand(batch_size)
+                elif time_index_tensor.ndim > 1:
+                    time_index_tensor = time_index_tensor.reshape(batch_size, -1)
+                    if time_index_tensor.shape[1] != 1:
+                        raise ValueError(
+                            "time_index tensors must be scalar per-sample values."
+                        )
+                    time_index_tensor = time_index_tensor.squeeze(-1)
+
+                if time_index_tensor.shape[0] != batch_size:
+                    if time_index_tensor.shape[0] == 1:
+                        time_index_tensor = time_index_tensor.expand(batch_size)
+                    else:
+                        raise ValueError(
+                            "time_index tensor batch dimension must match view batch size."
+                        )
+
+                time_index_tensor = time_index_tensor.to(device=device, dtype=dtype)
+
+            time_indices_per_view.append(time_index_tensor)
+
+        if not time_indices_per_view:
+            return None
+
+        time_indices = torch.cat(time_indices_per_view, dim=0)
+
+        # Compute sinusoidal positional encoding that is zero when time index is zero.
+        position = time_indices.unsqueeze(-1)
+        div_term = torch.exp(
+            torch.arange(0, embed_dim, 2, device=device, dtype=dtype)
+            * (-math.log(10000.0) / max(embed_dim, 1))
+        )
+
+        scaled_positions = position * div_term
+        time_encoding = torch.zeros(
+            time_indices.shape[0], embed_dim, device=device, dtype=dtype
+        )
+        time_encoding[:, 0::2] = torch.sin(scaled_positions)
+        if embed_dim > 1:
+            cos_terms = torch.cos(scaled_positions) - 1.0
+            time_encoding[:, 1::2] = cos_terms[:, : time_encoding[:, 1::2].shape[1]]
+
+        return time_encoding
 
     def _compute_pose_quats_and_trans_for_across_views_in_ref_view(
         self,

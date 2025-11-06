@@ -210,6 +210,7 @@ def preprocess_input_views_for_inference(
     2. Convert depth_z to depth_along_ray
     3. Convert camera_poses to the expected input keys (camera_pose_quats and camera_pose_trans)
     4. Default is_metric_scale to True when not provided
+    5. Default time_index to 0 when not provided
 
     Args:
         views: List of view dictionaries
@@ -278,6 +279,13 @@ def preprocess_input_views_for_inference(
             # Default to True for all samples in the batch
             processed_view["is_metric_scale"] = torch.ones(
                 batch_size, dtype=torch.bool, device=view["img"].device
+            )
+
+        # Step 5: Default time index to 0.0 when not provided
+        if "time_index" not in processed_view:
+            batch_size = view["img"].shape[0]
+            processed_view["time_index"] = torch.zeros(
+                batch_size, dtype=view["img"].dtype, device=view["img"].device
             )
 
         # Rename keys to match expected model input format

@@ -580,6 +580,10 @@ class BaseDataset(EasyDataset):
             # Append RNG state to the views, this allows to check whether the RNG is in the same state each time
             view["rng"] = int.from_bytes(self._rng.bytes(4), "big")
 
+            # Static datasets default to time index 0.0; dynamic datasets can overwrite this value.
+            if "time_index" not in view:
+                view["time_index"] = np.float32(0.0)
+
             # Compute and store the quaternions and translation for the camera poses
             # Notation is (x, y, z, w) for quaternions
             # This also ensures that the camera poses have a positive determinant (right-handed coordinate system)
