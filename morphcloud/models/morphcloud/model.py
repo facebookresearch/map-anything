@@ -2182,10 +2182,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             opacity_per_view = None
             opacity_logits_per_view = None
             if opacity_outputs is not None:
-                opacity_prob = opacity_outputs.probability.permute(0, 2, 3, 1)
-                opacity_logits = opacity_outputs.logits.permute(0, 2, 3, 1)
-                opacity_prob = opacity_prob.squeeze(-1).contiguous()
-                opacity_logits = opacity_logits.squeeze(-1).contiguous()
+                opacity_prob = opacity_outputs.probability.contiguous()
+                opacity_logits = opacity_outputs.logits.contiguous()
                 opacity_per_view = opacity_prob.chunk(num_views, dim=0)
                 opacity_logits_per_view = opacity_logits.chunk(num_views, dim=0)
 
@@ -2613,8 +2611,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                 - 'mask': torch.Tensor of shape (B, H, W, 1) - combo of non-ambiguous mask, edge mask and confidence-based mask if used
                 - 'non_ambiguous_mask': torch.Tensor of shape (B, H, W) - non-ambiguous mask
                 - 'non_ambiguous_mask_logits': torch.Tensor of shape (B, H, W) - non-ambiguous mask logits
-                - 'opacity': torch.Tensor of shape (B, H, W) - per-pixel opacity prior
-                - 'opacity_logits': torch.Tensor of shape (B, H, W) - raw opacity logits
+                - 'opacity': torch.Tensor of shape (B, T, H, W) - per-pixel opacity prior
+                - 'opacity_logits': torch.Tensor of shape (B, T, H, W) - raw opacity logits
                 - 'conf': torch.Tensor of shape (B, H, W) - confidence
 
         Raises:

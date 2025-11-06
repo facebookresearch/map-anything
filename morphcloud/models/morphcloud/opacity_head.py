@@ -17,15 +17,38 @@ class OpacityHeadOutput:
 class OpacityHead(nn.Module):
     """Predicts per-pixel opacity probabilities from dense DPT features."""
 
-    def __init__(self, input_dim: int, hidden_dim: int = 128):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 128,
+        output_dim: int = 128,
+    ):
+        """Initialise the opacity decoder.
+
+        Args:
+            input_dim: Number of channels in the incoming DPT features ``(B, C, H, W)``.
+            hidden_dim: Width of the intermediate convolutional layer.
+            output_dim: Number of temporal opacity bins ``T`` to regress per pixel.
+        """
+
         super().__init__()
         self.network = nn.Sequential(
             nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1),
             nn.GELU(),
-            nn.Conv2d(hidden_dim, 1, kernel_size=1),
+            nn.Conv2d(hidden_dim, output_dim, kernel_size=1),
         )
 
     def forward(self, features: torch.Tensor) -> OpacityHeadOutput:
+        """Decode temporally-indexed opacity probabilities.
+
+        Args:
+            features: Dense feature map of shape ``(B, C, H, W)`` produced by the DPT
+                regression head.
+
+        Returns:
+            ``OpacityHeadOutput`` whose tensors have shape ``(B, T, H, W)``.
+        """
+
         logits = self.network(features)
         probability = torch.sigmoid(logits)
         return OpacityHeadOutput(probability=probability, logits=logits)
