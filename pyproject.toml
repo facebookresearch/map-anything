@@ -65,11 +65,12 @@ all = [
 # Setuptools configuration
 [tool.setuptools]
 # Disable automatic package discovery to avoid conflicts
-packages = ["morphcloud"]
+packages = ["morphcloud", "mapanything"]
 
 # Include package data
 [tool.setuptools.package-data]
 "morphcloud" = ["**/*"]
+"mapanything" = ["**/*"]
 
 # Ruff for linting
 [tool.ruff]
