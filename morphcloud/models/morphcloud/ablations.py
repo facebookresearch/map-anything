@@ -576,13 +576,13 @@ class MapAnythingAblations(nn.Module):
         if self.pretrained_checkpoint_path is not None:
             if not self.load_specific_pretrained_submodules:
                 print(
-                    f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} ..."
+                    f"Loading pretrained MorphCloud weights from {self.pretrained_checkpoint_path} ..."
                 )
                 ckpt = torch.load(self.pretrained_checkpoint_path, weights_only=False)
                 print(self.load_state_dict(ckpt["model"]))
             else:
                 print(
-                    f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} for specific submodules: {self.specific_pretrained_submodules} ..."
+                    f"Loading pretrained MorphCloud weights from {self.pretrained_checkpoint_path} for specific submodules: {self.specific_pretrained_submodules} ..."
                 )
                 ckpt = torch.load(self.pretrained_checkpoint_path, weights_only=False)
                 filtered_ckpt = {}

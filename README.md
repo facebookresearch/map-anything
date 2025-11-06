@@ -113,7 +113,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Required imports
 import torch
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 from morphcloud.utils.image import load_images
 
 # Get inference device
@@ -121,7 +121,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Init model - This requires internet access or the huggingface hub cache to be pre-downloaded
 # For Apache 2.0 license model, use "facebook/map-anything-apache"
-model = MapAnything.from_pretrained("facebook/map-anything").to(device)
+model = MorphCloud.from_pretrained("facebook/map-anything").to(device)
 
 # Load and preprocess images from a folder or list of paths
 images = "path/to/your/images/"  # or ["path/to/img1.jpg", "path/to/img2.jpg", ...]
@@ -180,14 +180,14 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Required imports
 import torch
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 
 # Get inference device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Init model - This requires internet access or the huggingface hub cache to be pre-downloaded
 # For Apache 2.0 license model, use "facebook/map-anything-apache"
-model = MapAnything.from_pretrained("facebook/map-anything").to(device)
+model = MorphCloud.from_pretrained("facebook/map-anything").to(device)
 ```
 
 **Initialize the inputs:**

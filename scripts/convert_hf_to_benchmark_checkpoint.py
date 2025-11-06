@@ -21,12 +21,12 @@ from pathlib import Path
 
 import torch
 
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Convert HuggingFace MapAnything checkpoint to benchmark format"
+        description="Convert HuggingFace MorphCloud checkpoint to benchmark format"
     )
     parser.add_argument(
         "--hf_model_name",
@@ -72,8 +72,8 @@ def main():
         hf_model_name = "facebook/map-anything-apache"
 
     print(f"Loading HuggingFace model: {hf_model_name}")
-    model = MapAnything.from_pretrained(hf_model_name).to(device)
-    print("Successfully loaded model using MapAnything.from_pretrained()")
+    model = MorphCloud.from_pretrained(hf_model_name).to(device)
+    print("Successfully loaded model using MorphCloud.from_pretrained()")
 
     # Get model state dict
     print("Extracting model state dict...")

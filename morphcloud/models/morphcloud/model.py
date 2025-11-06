@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 """
-MapAnything model class defined using UniCeption modules.
+MorphCloud model class defined using UniCeption modules.
 """
 
 import inspect
@@ -88,8 +88,8 @@ if hasattr(torch.backends.cuda, "matmul") and hasattr(
     torch.backends.cuda.matmul.allow_tf32 = True
 
 
-class MapAnything(nn.Module, PyTorchModelHubMixin):
-    "Modular MapAnything model class that supports input of images & optional geometric modalities (multiple reconstruction tasks)."
+class MorphCloud(nn.Module, PyTorchModelHubMixin):
+    "Modular MorphCloud model class that supports input of images & optional geometric modalities (multiple reconstruction tasks)."
 
     def __init__(
         self,
@@ -604,13 +604,13 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         if self.pretrained_checkpoint_path is not None:
             if not self.load_specific_pretrained_submodules:
                 print(
-                    f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} ..."
+                    f"Loading pretrained MorphCloud weights from {self.pretrained_checkpoint_path} ..."
                 )
                 ckpt = torch.load(self.pretrained_checkpoint_path, weights_only=False)
                 print(self.load_state_dict(ckpt["model"]))
             else:
                 print(
-                    f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} for specific submodules: {self.specific_pretrained_submodules} ..."
+                    f"Loading pretrained MorphCloud weights from {self.pretrained_checkpoint_path} for specific submodules: {self.specific_pretrained_submodules} ..."
                 )
                 assert self.pred_head_type is not None, (
                     "Specific submodules to load cannot be None."
@@ -750,13 +750,13 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
     @classmethod
     def from_pretrained(
         cls, pretrained_model_name_or_path, *model_args, **kwargs
-    ) -> "MapAnything":
+    ) -> "MorphCloud":
         """Load pretrained weights while favoring the local model definition.
 
-        When running ``MapAnything.from_pretrained`` through the Hugging Face
+        When running ``MorphCloud.from_pretrained`` through the Hugging Face
         Hub, the default hub behaviour is to execute any ``auto_map`` registered
         remote code if ``trust_remote_code`` is not supplied. This caused the
-        demo script to instantiate the remote copy of MapAnything instead of the
+        demo script to instantiate the remote copy of MorphCloud instead of the
         repository's local implementation, so changes like the time index
         encoding were skipped. We override the mixin to default
         ``trust_remote_code`` to ``False`` whenever the installed
@@ -782,7 +782,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         # Older huggingface_hub versions do not expose the ``trust_remote_code``
         # argument and would silently execute remote modules. Mirror the hub's
         # behaviour locally so that we always instantiate this repository's
-        # MapAnything implementation.
+        # MorphCloud implementation.
         kwargs.pop("trust_remote_code", None)
         return cls._from_pretrained_without_remote(
             pretrained_model_name_or_path, *model_args, **kwargs
@@ -791,12 +791,12 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
     @classmethod
     def _from_pretrained_without_remote(
         cls, pretrained_model_name_or_path: str, *model_args, **kwargs
-    ) -> "MapAnything":
+    ) -> "MorphCloud":
         """Manual ``from_pretrained`` fallback for legacy ``huggingface_hub``.
 
         This helper mirrors ``PyTorchModelHubMixin.from_pretrained`` but bypasses
         any remote ``auto_map`` definitions by materialising the snapshot
-        locally, instantiating :class:`MapAnything` with the stored config and
+        locally, instantiating :class:`MorphCloud` with the stored config and
         loading the checkpoint with :func:`torch.load` or
         :func:`safetensors.torch.load_file`.
         """
@@ -846,7 +846,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         if ignored_runtime_kwargs:
             warnings.warn(
                 "The following arguments are not supported by the legacy "
-                "MapAnything.from_pretrained fallback and will be ignored: "
+                "MorphCloud.from_pretrained fallback and will be ignored: "
                 + ", ".join(sorted(ignored_runtime_kwargs.keys()))
             )
 
@@ -867,7 +867,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         if kwargs:
             unexpected = ", ".join(sorted(kwargs.keys()))
             raise TypeError(
-                f"Unexpected keyword arguments for MapAnything.from_pretrained: {unexpected}"
+                f"Unexpected keyword arguments for MorphCloud.from_pretrained: {unexpected}"
             )
 
         # Resolve the snapshot directory if a repo ID was provided.
@@ -911,7 +911,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         if not init_kwargs and not init_args:
             raise ValueError(
                 "The downloaded configuration does not contain the "
-                "initialisation parameters required to construct MapAnything."
+                "initialisation parameters required to construct MorphCloud."
             )
 
         model = cls(*init_args, **init_kwargs)

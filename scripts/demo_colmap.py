@@ -24,7 +24,7 @@ import trimesh
 from PIL import Image
 from torchvision import transforms as tvf
 
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 from morphcloud.third_party.np_to_pycolmap import (
     batch_np_matrix_to_pycolmap,
     batch_np_matrix_to_pycolmap_wo_track,
@@ -43,7 +43,7 @@ torch.backends.cudnn.deterministic = False
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="MapAnything COLMAP Demo")
+    parser = argparse.ArgumentParser(description="MorphCloud COLMAP Demo")
     parser.add_argument(
         "--scene_dir",
         type=str,
@@ -385,8 +385,8 @@ def demo_fn(args):
     print(f"Using dtype: {dtype}")
 
     # Init model
-    print("Loading MapAnything model from huggingface ...")
-    model = MapAnything.from_pretrained("facebook/map-anything").to(device)
+    print("Loading MorphCloud model from huggingface ...")
+    model = MorphCloud.from_pretrained("facebook/map-anything").to(device)
     model.eval()
 
     # Get image paths and preprocess them
@@ -397,7 +397,7 @@ def demo_fn(args):
     base_image_path_list = [os.path.basename(path) for path in image_path_list]
 
     # Load images and original coordinates
-    # Load Image in 1024, while running MapAnything with 518
+    # Load Image in 1024, while running MorphCloud with 518
     morphcloud_fixed_resolution = 518
     img_load_resolution = 1024
 
@@ -408,7 +408,7 @@ def demo_fn(args):
     original_coords = original_coords.to(device)
     print(f"Loaded {len(images)} images from {image_dir}")
 
-    # Run MapAnything to estimate camera and depth
+    # Run MorphCloud to estimate camera and depth
     # Run with 518 x 518 images
     extrinsic, intrinsic, depth_map, depth_conf, points_3d, img_no_norm, masks = (
         run_morphcloud(

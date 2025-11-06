@@ -48,7 +48,7 @@ def init_hydra_config(config_path, overrides=None):
 
 def initialize_morphcloud_model(high_level_config, device):
     """
-    Initialize MapAnything model with three-tier fallback approach:
+    Initialize MorphCloud model with three-tier fallback approach:
     1. Try HuggingFace from_pretrained()
     2. Download HF config + use local model factory + load HF weights
     3. Pure local configuration fallback
@@ -58,14 +58,14 @@ def initialize_morphcloud_model(high_level_config, device):
         device (torch.device): Device to load the model on
 
     Returns:
-        torch.nn.Module: Initialized MapAnything model
+        torch.nn.Module: Initialized MorphCloud model
     """
     import torch
     from huggingface_hub import hf_hub_download
 
-    from morphcloud.models import init_model, MapAnything
+    from morphcloud.models import init_model, MorphCloud
 
-    print("Initializing MapAnything model...")
+    print("Initializing MorphCloud model...")
 
     # Initialize Hydra config and create model from configuration
     cfg = init_hydra_config(
@@ -74,11 +74,11 @@ def initialize_morphcloud_model(high_level_config, device):
 
     # Try using from_pretrained first
     try:
-        print("Loading MapAnything model from_pretrained...")
-        model = MapAnything.from_pretrained(high_level_config["hf_model_name"]).to(
+        print("Loading MorphCloud model from_pretrained...")
+        model = MorphCloud.from_pretrained(high_level_config["hf_model_name"]).to(
             device
         )
-        print("Loading MapAnything model from_pretrained succeeded...")
+        print("Loading MorphCloud model from_pretrained succeeded...")
         return model
     except Exception as e:
         print(f"from_pretrained failed: {e}")
@@ -170,7 +170,7 @@ def initialize_morphcloud_model(high_level_config, device):
 
 
 def initialize_morphcloud_local(local_config, device):
-    """Initialize a MapAnything model entirely from local resources.
+    """Initialize a MorphCloud model entirely from local resources.
 
     Args:
         local_config (dict):
@@ -184,7 +184,7 @@ def initialize_morphcloud_local(local_config, device):
         device (torch.device | str): Target device that will host the model.
 
     Returns:
-        torch.nn.Module: MapAnything model moved to ``device`` and switched to ``eval()``.
+        torch.nn.Module: MorphCloud model moved to ``device`` and switched to ``eval()``.
 
     Raises:
         FileNotFoundError: Raised when the JSON config or checkpoint cannot be found.

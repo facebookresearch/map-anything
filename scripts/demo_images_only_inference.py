@@ -19,7 +19,7 @@ import numpy as np
 import rerun as rr
 import torch
 
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 from morphcloud.utils.geometry import depthmap_to_world_frame
 from morphcloud.utils.image import load_images
 from morphcloud.utils.viz import (
@@ -137,11 +137,11 @@ def main():
     # Initialize model from HuggingFace
     if args.apache:
         model_name = "facebook/map-anything-apache"
-        print("Loading Apache 2.0 licensed MapAnything model...")
+        print("Loading Apache 2.0 licensed MorphCloud model...")
     else:
         model_name = "facebook/map-anything"
-        print("Loading CC-BY-NC 4.0 licensed MapAnything model...")
-    model = MapAnything.from_pretrained(model_name).to(device)
+        print("Loading CC-BY-NC 4.0 licensed MorphCloud model...")
+    model = MorphCloud.from_pretrained(model_name).to(device)
 
     # Load images
     print(f"Loading images from: {args.image_folder}")
@@ -163,7 +163,7 @@ def main():
     # Initialize Rerun if visualization is enabled
     if args.viz:
         print("Starting visualization...")
-        viz_string = "MapAnything_Visualization"
+        viz_string = "MorphCloud_Visualization"
         rr.script_setup(args, viz_string)
         rr.set_time("stable_time", sequence=0)
         rr.log("morphcloud", rr.ViewCoordinates.RDF, static=True)

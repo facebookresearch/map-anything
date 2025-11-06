@@ -30,7 +30,7 @@ import rerun as rr
 import torch
 from PIL import Image
 
-from morphcloud.models import MapAnything
+from morphcloud.models import MorphCloud
 from morphcloud.utils.colmap import get_camera_matrix, qvec2rotmat, read_model
 from morphcloud.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
 from morphcloud.utils.image import preprocess_inputs
@@ -364,11 +364,11 @@ def main():
     # Initialize model from HuggingFace
     if args.apache:
         model_name = "facebook/map-anything-apache"
-        print("Loading Apache 2.0 licensed MapAnything model...")
+        print("Loading Apache 2.0 licensed MorphCloud model...")
     else:
         model_name = "facebook/map-anything"
-        print("Loading CC-BY-NC 4.0 licensed MapAnything model...")
-    model = MapAnything.from_pretrained(model_name).to(device)
+        print("Loading CC-BY-NC 4.0 licensed MorphCloud model...")
+    model = MorphCloud.from_pretrained(model_name).to(device)
 
     # Load COLMAP data
     print(f"Loading COLMAP data from: {args.colmap_path}")
@@ -385,7 +385,7 @@ def main():
     processed_views = preprocess_inputs(views_example, verbose=False)
 
     # Run model inference
-    print("Running MapAnything inference on COLMAP data...")
+    print("Running MorphCloud inference on COLMAP data...")
     outputs = model.infer(
         processed_views,
         memory_efficient_inference=args.memory_efficient_inference,
@@ -411,7 +411,7 @@ def main():
     # Initialize Rerun if visualization is enabled
     if args.viz:
         print("Starting visualization...")
-        viz_string = "MapAnything_COLMAP_Inference_Visualization"
+        viz_string = "MorphCloud_COLMAP_Inference_Visualization"
         rr.script_setup(args, viz_string)
         rr.set_time("stable_time", sequence=0)
         rr.log("morphcloud", rr.ViewCoordinates.RDF, static=True)

@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 """
-Model Factory for MapAnything
+Model Factory for MorphCloud
 """
 
 import importlib.util
@@ -16,7 +16,7 @@ from omegaconf import DictConfig, OmegaConf
 
 # Core models that are always available
 from morphcloud.models.morphcloud import (
-    MapAnything,
+    MorphCloud,
     MapAnythingAblations,
     ModularDUSt3R,
 )
@@ -63,7 +63,7 @@ def init_model(
 MODEL_CONFIGS = {
     # Core models
     "morphcloud": {
-        "class": MapAnything,
+        "class": MorphCloud,
     },
     "morphcloud_ablations": {
         "class": MapAnythingAblations,
@@ -127,7 +127,7 @@ def check_module_exists(module_path):
 
 def model_factory(model_str: str, **kwargs):
     """
-    Model factory for MapAnything.
+    Model factory for MorphCloud.
 
     Args:
         model_str (str): Name of the model to create.
@@ -179,7 +179,7 @@ def model_factory(model_str: str, **kwargs):
 
 def get_available_models() -> list:
     """
-    Get a list of available models in MapAnything.
+    Get a list of available models in MorphCloud.
 
     Returns:
         list: A list of available model names.
