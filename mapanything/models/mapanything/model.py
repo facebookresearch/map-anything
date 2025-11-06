@@ -8,7 +8,9 @@ MapAnything model class defined using UniCeption modules.
 """
 
 import inspect
+import json
 import math
+import os
 import warnings
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -751,14 +753,15 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
     ) -> "MapAnything":
         """Load pretrained weights while favoring the local model definition.
 
-        When running `MapAnything.from_pretrained` through the Hugging Face Hub,
-        the default hub behaviour is to execute any `auto_map`-registered remote
-        code if ``trust_remote_code`` is left unspecified. This caused the demo
-        script to instantiate the remote copy of MapAnything instead of the
+        When running ``MapAnything.from_pretrained`` through the Hugging Face
+        Hub, the default hub behaviour is to execute any ``auto_map`` registered
+        remote code if ``trust_remote_code`` is not supplied. This caused the
+        demo script to instantiate the remote copy of MapAnything instead of the
         repository's local implementation, so changes like the time index
         encoding were skipped. We override the mixin to default
         ``trust_remote_code`` to ``False`` whenever the installed
-        ``huggingface_hub`` version supports that flag.
+        ``huggingface_hub`` version supports that flag and fall back to a manual
+        loading path otherwise.
         """
 
         mixin_from_pretrained = PyTorchModelHubMixin.from_pretrained
@@ -772,13 +775,243 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         if supports_trust_remote_code:
             if kwargs.get("trust_remote_code") is None:
                 kwargs["trust_remote_code"] = False
-        else:
-            # Older versions of huggingface_hub might not accept the argument.
-            kwargs.pop("trust_remote_code", None)
+            return mixin_from_pretrained.__func__(
+                cls, pretrained_model_name_or_path, *model_args, **kwargs
+            )
 
-        return mixin_from_pretrained.__func__(
-            cls, pretrained_model_name_or_path, *model_args, **kwargs
+        # Older huggingface_hub versions do not expose the ``trust_remote_code``
+        # argument and would silently execute remote modules. Mirror the hub's
+        # behaviour locally so that we always instantiate this repository's
+        # MapAnything implementation.
+        kwargs.pop("trust_remote_code", None)
+        return cls._from_pretrained_without_remote(
+            pretrained_model_name_or_path, *model_args, **kwargs
         )
+
+    @classmethod
+    def _from_pretrained_without_remote(
+        cls, pretrained_model_name_or_path: str, *model_args, **kwargs
+    ) -> "MapAnything":
+        """Manual ``from_pretrained`` fallback for legacy ``huggingface_hub``.
+
+        This helper mirrors ``PyTorchModelHubMixin.from_pretrained`` but bypasses
+        any remote ``auto_map`` definitions by materialising the snapshot
+        locally, instantiating :class:`MapAnything` with the stored config and
+        loading the checkpoint with :func:`torch.load` or
+        :func:`safetensors.torch.load_file`.
+        """
+
+        from huggingface_hub import hf_hub_download, snapshot_download
+        from huggingface_hub.utils import EntryNotFoundError
+
+        map_location = kwargs.pop("map_location", None)
+        strict = kwargs.pop("strict", True)
+        torch_dtype = kwargs.pop("torch_dtype", None)
+
+        # Collect download-related kwargs supported by ``hf_hub_download``.
+        download_kwarg_names = {
+            "cache_dir",
+            "force_download",
+            "local_dir",
+            "local_dir_use_symlinks",
+            "local_files_only",
+            "proxies",
+            "repo_type",
+            "resume_download",
+            "revision",
+            "subfolder",
+            "token",
+            "use_auth_token",
+        }
+        download_kwargs = {
+            name: kwargs.pop(name)
+            for name in list(kwargs.keys())
+            if name in download_kwarg_names
+        }
+
+        if "use_auth_token" in download_kwargs and "token" not in download_kwargs:
+            download_kwargs["token"] = download_kwargs.pop("use_auth_token")
+
+        ignored_runtime_kwargs = {
+            name: kwargs.pop(name)
+            for name in (
+                "device_map",
+                "low_cpu_mem_usage",
+                "max_memory",
+                "offload_folder",
+                "offload_state_dict",
+            )
+            if name in kwargs
+        }
+        if ignored_runtime_kwargs:
+            warnings.warn(
+                "The following arguments are not supported by the legacy "
+                "MapAnything.from_pretrained fallback and will be ignored: "
+                + ", ".join(sorted(ignored_runtime_kwargs.keys()))
+            )
+
+        # Allow callers to override the config/weights filenames while
+        # providing sensible defaults for the public checkpoints.
+        config_filename = kwargs.pop("config_filename", "config.json")
+        requested_weights = kwargs.pop("weights_filename", None)
+        weight_filenames = [
+            requested_weights,
+            "model.safetensors",
+            "pytorch_model.bin",
+            "model.bin",
+        ]
+        weight_filenames = [
+            filename for filename in weight_filenames if filename is not None
+        ]
+
+        if kwargs:
+            unexpected = ", ".join(sorted(kwargs.keys()))
+            raise TypeError(
+                f"Unexpected keyword arguments for MapAnything.from_pretrained: {unexpected}"
+            )
+
+        # Resolve the snapshot directory if a repo ID was provided.
+        if os.path.isdir(pretrained_model_name_or_path):
+            snapshot_dir = pretrained_model_name_or_path
+        else:
+            snapshot_dir = snapshot_download(
+                pretrained_model_name_or_path, **download_kwargs
+            )
+
+        def _resolve_local_path(filename: str) -> Optional[str]:
+            candidate = os.path.join(snapshot_dir, filename)
+            return candidate if os.path.exists(candidate) else None
+
+        # Locate the configuration file.
+        config_path = _resolve_local_path(config_filename)
+        if config_path is None and not os.path.isdir(pretrained_model_name_or_path):
+            try:
+                config_path = hf_hub_download(
+                    pretrained_model_name_or_path,
+                    config_filename,
+                    **download_kwargs,
+                )
+            except EntryNotFoundError as exc:  # pragma: no cover - defensive
+                raise FileNotFoundError(
+                    f"Could not find '{config_filename}' in the snapshot for "
+                    f"{pretrained_model_name_or_path}."
+                ) from exc
+
+        if config_path is None:
+            raise FileNotFoundError(
+                f"Configuration file '{config_filename}' not found in {snapshot_dir}"
+            )
+
+        with open(config_path, "r", encoding="utf-8") as handle:
+            config_data = json.load(handle)
+
+        init_args, init_kwargs = cls._extract_model_init_args(config_data)
+        init_args = list(model_args) + init_args
+
+        if not init_kwargs and not init_args:
+            raise ValueError(
+                "The downloaded configuration does not contain the "
+                "initialisation parameters required to construct MapAnything."
+            )
+
+        model = cls(*init_args, **init_kwargs)
+
+        def _load_weights(path: str) -> Dict[str, torch.Tensor]:
+            if path.endswith(".safetensors"):
+                try:
+                    from safetensors.torch import load_file
+                except ImportError as exc:  # pragma: no cover - optional dep
+                    raise ImportError(
+                        "Loading safetensors checkpoints requires the "
+                        "'safetensors' package to be installed."
+                    ) from exc
+
+                return load_file(path)
+
+            checkpoint = torch.load(
+                path,
+                map_location=map_location if map_location is not None else "cpu",
+                weights_only=False,
+            )
+            if isinstance(checkpoint, dict):
+                for key in ("state_dict", "model"):
+                    if key in checkpoint and isinstance(checkpoint[key], dict):
+                        return checkpoint[key]
+            if isinstance(checkpoint, dict):
+                return checkpoint
+            raise TypeError(
+                f"Unexpected checkpoint format at '{path}': {type(checkpoint)!r}"
+            )
+
+        weights_path: Optional[str] = None
+        for filename in weight_filenames:
+            weights_path = _resolve_local_path(filename)
+            if weights_path is None and not os.path.isdir(pretrained_model_name_or_path):
+                try:
+                    weights_path = hf_hub_download(
+                        pretrained_model_name_or_path,
+                        filename,
+                        **download_kwargs,
+                    )
+                except EntryNotFoundError:
+                    weights_path = None
+            if weights_path is not None:
+                break
+
+        if weights_path is None:
+            raise FileNotFoundError(
+                f"Could not locate any of the expected weight files {weight_filenames} "
+                f"for {pretrained_model_name_or_path}."
+            )
+
+        state_dict = _load_weights(weights_path)
+        model.load_state_dict(state_dict, strict=strict)
+
+        if torch_dtype is not None:
+            model = model.to(dtype=torch_dtype)
+
+        return model
+
+    @staticmethod
+    def _extract_model_init_args(config_data: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
+        """Derive constructor arguments from a saved Hugging Face config."""
+
+        if not isinstance(config_data, dict):
+            return [], {}
+
+        def _maybe_extract(mapping: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
+            if not isinstance(mapping, dict):
+                return [], {}
+
+            for key in ("class_init_args", "model_init_kwargs", "init_kwargs", "model_kwargs"):
+                if key in mapping and isinstance(mapping[key], dict):
+                    args = mapping.get("model_args") or mapping.get("init_args") or []
+                    return list(args), mapping[key]
+
+            for key in ("model_config",):
+                if key in mapping and isinstance(mapping[key], dict):
+                    args = mapping.get("model_args") or mapping.get("init_args") or []
+                    return list(args), mapping[key]
+
+            if "model" in mapping and isinstance(mapping["model"], dict):
+                return _maybe_extract(mapping["model"])
+
+            return [], {}
+
+        args, kwargs = _maybe_extract(config_data)
+
+        if not kwargs and isinstance(config_data, dict):
+            required_keys = {
+                "name",
+                "encoder_config",
+                "info_sharing_config",
+                "pred_head_config",
+                "geometric_input_config",
+            }
+            if required_keys.issubset(config_data.keys()):
+                return [], config_data
+
+        return args, kwargs
 
     def _compute_pose_quats_and_trans_for_across_views_in_ref_view(
         self,
