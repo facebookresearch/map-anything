@@ -7,6 +7,7 @@
 MapAnything model class defined using UniCeption modules.
 """
 
+import inspect
 import math
 import warnings
 from functools import partial
@@ -743,6 +744,41 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             time_encoding[:, 1::2] = cos_terms[:, : time_encoding[:, 1::2].shape[1]]
 
         return time_encoding
+
+    @classmethod
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, *model_args, **kwargs
+    ) -> "MapAnything":
+        """Load pretrained weights while favoring the local model definition.
+
+        When running `MapAnything.from_pretrained` through the Hugging Face Hub,
+        the default hub behaviour is to execute any `auto_map`-registered remote
+        code if ``trust_remote_code`` is left unspecified. This caused the demo
+        script to instantiate the remote copy of MapAnything instead of the
+        repository's local implementation, so changes like the time index
+        encoding were skipped. We override the mixin to default
+        ``trust_remote_code`` to ``False`` whenever the installed
+        ``huggingface_hub`` version supports that flag.
+        """
+
+        mixin_from_pretrained = PyTorchModelHubMixin.from_pretrained
+
+        try:
+            signature = inspect.signature(mixin_from_pretrained)
+            supports_trust_remote_code = "trust_remote_code" in signature.parameters
+        except (TypeError, ValueError):  # pragma: no cover - defensive fallback
+            supports_trust_remote_code = False
+
+        if supports_trust_remote_code:
+            if kwargs.get("trust_remote_code") is None:
+                kwargs["trust_remote_code"] = False
+        else:
+            # Older versions of huggingface_hub might not accept the argument.
+            kwargs.pop("trust_remote_code", None)
+
+        return mixin_from_pretrained.__func__(
+            cls, pretrained_model_name_or_path, *model_args, **kwargs
+        )
 
     def _compute_pose_quats_and_trans_for_across_views_in_ref_view(
         self,
