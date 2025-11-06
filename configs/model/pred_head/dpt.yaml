@@ -10,8 +10,9 @@ regressor_head:
   output_dim: ${model.pred_head.adaptor_config.input_dim}
   checkpoint_gradient: ${model.pred_head.gradient_checkpointing}
 opacity_head:
-  hidden_dim: 128
   output_dim: ${model.pred_head.max_time_steps}
+  hidden_dim: 128
+  checkpoint_gradient: ${model.pred_head.gradient_checkpointing}
 max_time_steps: 128
 adaptor_type: ${model.pred_head.adaptor_config.type}
 adaptor: ${model.pred_head.adaptor_config.init_dict}

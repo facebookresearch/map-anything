@@ -1,9 +1,13 @@
-"""Lightweight decoder head for predicting per-pixel opacity volumes."""
+"""Opacity prediction head leveraging UniCeption's DPT regression decoder."""
 
 from dataclasses import dataclass
+from typing import Union
 
 import torch
 import torch.nn as nn
+
+from uniception.models.prediction_heads.base import PredictionHeadInput
+from uniception.models.prediction_heads.dpt import DPTRegressionProcessor
 
 
 @dataclass
@@ -15,41 +19,54 @@ class OpacityHeadOutput:
 
 
 class OpacityHead(nn.Module):
-    """Predicts per-pixel opacity probabilities from dense DPT features."""
+    """Predict per-pixel opacity volumes using UniCeption's DPT regression blocks."""
 
     def __init__(
         self,
         input_dim: int,
         hidden_dim: int = 128,
         output_dim: int = 128,
+        checkpoint_gradient: bool = False,
     ):
-        """Initialise the opacity decoder.
+        """Initialise the opacity decoder backed by UniCeption's DPT processor.
 
         Args:
-            input_dim: Number of channels in the incoming DPT features ``(B, C, H, W)``.
-            hidden_dim: Width of the intermediate convolutional layer.
+            input_dim: Channel dimension of the incoming DPT decoded features.
+            hidden_dim: Unused compatibility parameter retained for config stability.
             output_dim: Number of temporal opacity bins ``T`` to regress per pixel.
+            checkpoint_gradient: Whether to enable gradient checkpointing inside the
+                UniCeption regression processor.
         """
 
         super().__init__()
-        self.network = nn.Sequential(
-            nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1),
-            nn.GELU(),
-            nn.Conv2d(hidden_dim, output_dim, kernel_size=1),
+        self.hidden_dim = hidden_dim
+        self.decoder = DPTRegressionProcessor(
+            input_feature_dim=input_dim,
+            output_dim=output_dim,
+            checkpoint_gradient=checkpoint_gradient,
         )
 
-    def forward(self, features: torch.Tensor) -> OpacityHeadOutput:
-        """Decode temporally-indexed opacity probabilities.
+    def forward(
+        self, features: Union[torch.Tensor, PredictionHeadInput]
+    ) -> OpacityHeadOutput:
+        """Decode temporally-indexed opacity logits and probabilities.
 
         Args:
-            features: Dense feature map of shape ``(B, C, H, W)`` produced by the DPT
-                regression head.
+            features: Either a dense feature tensor of shape ``(B, C, H, W)`` or a
+                ``PredictionHeadInput`` whose ``last_feature`` field contains such a
+                tensor.
 
         Returns:
             ``OpacityHeadOutput`` whose tensors have shape ``(B, T, H, W)``.
         """
 
-        logits = self.network(features)
+        if isinstance(features, PredictionHeadInput):
+            head_input = features
+        else:
+            head_input = PredictionHeadInput(last_feature=features)
+
+        decoder_output = self.decoder(head_input)
+        logits = decoder_output.decoded_channels
         probability = torch.sigmoid(logits)
         return OpacityHeadOutput(probability=probability, logits=logits)
 
