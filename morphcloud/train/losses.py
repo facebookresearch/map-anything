@@ -15,6 +15,7 @@ from copy import copy, deepcopy
 import einops as ein
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from morphcloud.utils.geometry import (
     angle_diff_vec3,
@@ -23,9 +24,11 @@ from morphcloud.utils.geometry import (
     convert_ray_dirs_depth_along_ray_pose_trans_quats_to_pointmap,
     geotrf,
     normalize_multiple_pointclouds,
+    project_pts3d_to_image,
     quaternion_inverse,
     quaternion_multiply,
     quaternion_to_rotation_matrix,
+    recover_pinhole_intrinsics_from_ray_directions,
     transform_pose_using_quats_and_trans_2_to_1,
 )
 
@@ -812,6 +815,412 @@ class ConfLoss(MultiLoss):
                 total_loss = total_loss + loss_mean
 
         return total_loss, dict(**conf_loss_details, **pixel_loss_details)
+
+
+class PhotometricReprojectionLoss(Criterion, MultiLoss):
+    """Differentiable multi-view photometric loss that fuses cross-view geometry."""
+
+    def __init__(
+        self,
+        criterion,
+        depth_key="depth_along_ray",
+        ray_directions_key="ray_directions",
+        cam_trans_key="cam_trans",
+        cam_quats_key="cam_quats",
+        image_key="img",
+        timestamp_key="timestamp",
+        opacity_key="opacity",
+        time_samples_key="time_samples",
+        valid_mask_key="non_ambiguous_mask",
+        min_depth=1e-6,
+    ):
+        """Initialise the photometric reprojection loss.
+
+        Args:
+            criterion (BaseCriterion): Base photometric criterion operating on per-pixel colours.
+            depth_key (str): Key pointing to per-view depth predictions of shape ``(B, V, T, H, W)``.
+            ray_directions_key (str): Key for per-view ray directions of shape ``(B, V, H, W, 3)``.
+            cam_trans_key (str): Key for camera translation predictions of shape ``(B, V, 3)``.
+            cam_quats_key (str): Key for camera rotation predictions (quaternions) of shape ``(B, V, 4)``.
+            image_key (str): Key referencing the input RGB tensor ``(B, V, C, H, W)``.
+            timestamp_key (str): Key for per-view timestamps stored in ``batch`` with shape ``(B, V)`` or ``(B, V, 1)``.
+            opacity_key (str): Key for per-point opacity tensor ``(B, V, T, H, W)``.
+            time_samples_key (str): Key referencing the discrete temporal samples predicted alongside geometry.
+            valid_mask_key (str): Optional key inside ``batch`` containing dataset validity masks ``(B, V, H, W)``.
+            min_depth (float): Minimum valid depth used to reject invalid projections.
+        """
+
+        super().__init__(criterion)
+        self.depth_key = depth_key
+        self.ray_directions_key = ray_directions_key
+        self.cam_trans_key = cam_trans_key
+        self.cam_quats_key = cam_quats_key
+        self.image_key = image_key
+        self.timestamp_key = timestamp_key
+        self.opacity_key = opacity_key
+        self.time_samples_key = time_samples_key
+        self.valid_mask_key = valid_mask_key
+        self.min_depth = min_depth
+
+        # Always operate in per-pixel mode for compatibility with confidence weighting.
+        self.criterion.reduction = "none"
+        self.flatten_across_image_only = False
+
+    def get_name(self):
+        """Return a descriptive identifier for logging purposes."""
+
+        return (
+            f"PhotometricReprojectionLoss({self.criterion.__class__.__name__},"
+            f" depth_key='{self.depth_key}', ray_key='{self.ray_directions_key}')"
+        )
+
+    def _pose_from_quat_and_trans(self, cam_quats, cam_trans):
+        """Construct camera-to-world matrices from quaternions and translations."""
+
+        batch_size = cam_quats.shape[0]
+        pose = torch.eye(4, device=cam_quats.device, dtype=cam_quats.dtype).unsqueeze(0)
+        pose = pose.repeat(batch_size, 1, 1)
+        pose[:, :3, :3] = quaternion_to_rotation_matrix(cam_quats)
+        pose[:, :3, 3] = cam_trans
+        return pose
+
+    def _select_time_index(self, available_times, target_time, fallback_index):
+        """Select the temporal slice that best matches the target timestamp."""
+
+        if available_times is None:
+            return fallback_index
+
+        available_times = available_times.reshape(-1).to(target_time.device)
+        if available_times.numel() == 0:
+            return fallback_index
+
+        diff = torch.abs(available_times - target_time)
+        best_idx = torch.argmin(diff).item()
+        return int(best_idx)
+
+    def _gather_temporal_slice(self, tensor, time_index):
+        """Return a spatial slice from a temporal tensor (T, H, W)."""
+
+        if tensor.dim() >= 3 and tensor.shape[-1] == 1:
+            tensor = tensor.squeeze(-1)
+        if tensor.dim() == 3:
+            if tensor.shape[0] == 1:
+                return tensor[0]
+            return tensor[time_index]
+        if tensor.dim() == 2:
+            return tensor
+        raise ValueError(
+            f"Unsupported tensor shape {tuple(tensor.shape)} for temporal slicing"
+        )
+
+    def _normalize_depth_tensor(self, depth):
+        """Ensure depth predictions follow the (B, V, T, H, W) convention."""
+
+        if depth.dim() == 5 and depth.shape[-1] == 1:
+            depth = depth.squeeze(-1)
+        if depth.dim() == 4:  # (B, V, H, W)
+            depth = depth.unsqueeze(2)
+        if depth.dim() != 5:
+            raise ValueError(
+                f"Depth tensor must be 5D after normalisation; received shape {tuple(depth.shape)}"
+            )
+        return depth
+
+    def _normalize_opacity_tensor(self, opacity, target_depth):
+        """Normalise opacity tensor to match the temporal layout of depth predictions."""
+
+        if opacity.dim() == 6 and opacity.shape[-1] == 1:
+            opacity = opacity.squeeze(-1)
+        if opacity.dim() == 5:
+            return opacity
+        if opacity.dim() == 4:  # (B, V, H, W)
+            return opacity.unsqueeze(2).expand_as(target_depth)
+        raise ValueError(
+            f"Opacity tensor must broadcast to depth; received shape {tuple(opacity.shape)}"
+        )
+
+    def _normalize_ray_directions(self, ray_dirs):
+        """Ensure ray directions are stored as (B, V, H, W, 3)."""
+
+        if ray_dirs.dim() != 5:
+            raise ValueError(
+                f"Ray directions must be a 5D tensor; received shape {tuple(ray_dirs.shape)}"
+            )
+        if ray_dirs.shape[-1] == 3:
+            return ray_dirs
+        if ray_dirs.shape[2] == 3:
+            return ray_dirs.permute(0, 1, 3, 4, 2).contiguous()
+        raise ValueError(
+            "Unable to infer ray direction layout; expected last dimension of size 3."
+        )
+
+    def _splat_colors(
+        self,
+        uv,
+        colors,
+        weights,
+        height,
+        width,
+        accum_colors,
+        accum_weights,
+    ):
+        """Bilinearly splat coloured samples into the target image plane."""
+
+        if uv.numel() == 0:
+            return
+
+        x = uv[:, 0]
+        y = uv[:, 1]
+
+        x0 = torch.floor(x)
+        y0 = torch.floor(y)
+        x1 = torch.clamp(x0 + 1, max=width - 1)
+        y1 = torch.clamp(y0 + 1, max=height - 1)
+
+        wx1 = (x - x0).clamp(min=0.0, max=1.0)
+        wy1 = (y - y0).clamp(min=0.0, max=1.0)
+        wx0 = 1.0 - wx1
+        wy0 = 1.0 - wy1
+
+        neighbors = [
+            (x0.long(), y0.long(), wx0 * wy0),
+            (x0.long(), y1.long(), wx0 * wy1),
+            (x1.long(), y0.long(), wx1 * wy0),
+            (x1.long(), y1.long(), wx1 * wy1),
+        ]
+
+        weights = weights.unsqueeze(-1)
+        for x_idx, y_idx, blend in neighbors:
+            mask = (x_idx >= 0) & (x_idx < width) & (y_idx >= 0) & (y_idx < height)
+            if not torch.any(mask):
+                continue
+            idx = (y_idx[mask] * width + x_idx[mask]).long()
+            w = (blend[mask].unsqueeze(-1) * weights[mask])
+            accum_weights.index_add_(0, idx, w.squeeze(-1))
+            accum_colors.index_add_(0, idx, w * colors[mask])
+
+    def _render_view(
+        self,
+        batch_idx,
+        target_idx,
+        target_time,
+        images,
+        depth,
+        opacity,
+        ray_dirs,
+        cam_trans,
+        cam_quats,
+        intrinsics,
+        world2cam,
+        time_samples,
+    ):
+        """Reconstruct the target image from the remaining views using opacity-weighted splatting."""
+
+        device = images.device
+        dtype = images.dtype
+        _, num_views, channels, height, width = images.shape
+
+        accum_colors = torch.zeros(height * width, channels, device=device, dtype=dtype)
+        accum_weights = torch.zeros(height * width, device=device, dtype=dtype)
+
+        target_intrinsics = intrinsics[batch_idx, target_idx]
+        target_world2cam = world2cam[batch_idx, target_idx]
+
+        for source_idx in range(num_views):
+            if source_idx == target_idx:
+                continue
+
+            depth_view = depth[batch_idx, source_idx]
+            opacity_view = opacity[batch_idx, source_idx]
+
+            fallback_index = min(target_idx, depth_view.shape[0] - 1)
+            available_times = None
+            if time_samples is not None:
+                if time_samples.dim() == 3:
+                    available_times = time_samples[batch_idx, source_idx]
+                elif time_samples.dim() == 2:
+                    available_times = time_samples[batch_idx]
+                else:
+                    available_times = time_samples
+
+            time_idx = self._select_time_index(available_times, target_time, fallback_index)
+
+            depth_slice = self._gather_temporal_slice(depth_view, time_idx)
+            opacity_slice = self._gather_temporal_slice(opacity_view, time_idx)
+
+            depth_slice = depth_slice.squeeze(-1) if depth_slice.dim() == 3 else depth_slice
+            opacity_slice = opacity_slice.squeeze(-1) if opacity_slice.dim() == 3 else opacity_slice
+
+            valid = torch.isfinite(depth_slice) & (depth_slice > self.min_depth)
+            valid = valid & torch.isfinite(opacity_slice)
+            if not torch.any(valid):
+                continue
+
+            rays = ray_dirs[batch_idx, source_idx]
+            if rays.dim() == 4 and rays.shape[0] == 3:
+                rays = rays.permute(1, 2, 0)
+
+            pts_world = convert_ray_dirs_depth_along_ray_pose_trans_quats_to_pointmap(
+                rays,
+                depth_slice.unsqueeze(-1),
+                cam_trans[batch_idx, source_idx],
+                cam_quats[batch_idx, source_idx],
+            )
+
+            ones = torch.ones((*pts_world.shape[:2], 1), device=device, dtype=dtype)
+            pts_world_h = torch.cat([pts_world, ones], dim=-1)
+            pts_cam = torch.einsum("ij,hwj->hwi", target_world2cam, pts_world_h)[..., :3]
+            proj = project_pts3d_to_image(pts_cam, target_intrinsics, return_z_dim=True)
+
+            uv = proj[..., :2]
+            depth_in_target = proj[..., 2]
+
+            valid = valid & torch.isfinite(uv[..., 0]) & torch.isfinite(uv[..., 1])
+            valid = valid & torch.isfinite(depth_in_target) & (depth_in_target > self.min_depth)
+            valid = valid & (uv[..., 0] >= 0) & (uv[..., 0] <= width - 1)
+            valid = valid & (uv[..., 1] >= 0) & (uv[..., 1] <= height - 1)
+
+            if not torch.any(valid):
+                continue
+
+            uv_valid = uv[valid]
+            opacity_valid = opacity_slice[valid].clamp(min=0.0)
+            source_colors = images[batch_idx, source_idx].permute(1, 2, 0).contiguous()
+            colors_valid = source_colors[valid]
+
+            self._splat_colors(
+                uv_valid,
+                colors_valid,
+                opacity_valid,
+                height,
+                width,
+                accum_colors,
+                accum_weights,
+            )
+
+        valid_mask = accum_weights > 0
+        reconstruction = torch.zeros(height * width, channels, device=device, dtype=dtype)
+        if torch.any(valid_mask):
+            reconstruction[valid_mask] = (
+                accum_colors[valid_mask]
+                / accum_weights[valid_mask].unsqueeze(-1).clamp_min(1e-6)
+            )
+
+        reconstruction = reconstruction.view(height, width, channels).permute(2, 0, 1).contiguous()
+        return reconstruction, valid_mask.view(height, width)
+
+    def compute_loss(self, batch, preds, **kw):
+        """Compute the photometric reprojection loss for a batch of multi-view sequences."""
+
+        images = batch[self.image_key]
+        if images.dim() != 5:
+            raise ValueError(
+                f"Expected image tensor with shape (B, V, C, H, W); received {tuple(images.shape)}"
+            )
+
+        batch_size, num_views, channels, height, width = images.shape
+        if num_views < 2:
+            zero = torch.zeros(
+                (), device=images.device, dtype=images.dtype if images.is_floating_point() else torch.float32
+            )
+            return zero, {}
+
+        timestamps = batch[self.timestamp_key]
+        if timestamps.dim() == 3 and timestamps.shape[-1] == 1:
+            timestamps = timestamps.squeeze(-1)
+        if timestamps.dim() != 2:
+            raise ValueError(
+                f"Timestamps must be shaped (B, V) or (B, V, 1); received {tuple(timestamps.shape)}"
+            )
+
+        depth = self._normalize_depth_tensor(preds[self.depth_key])
+        opacity = self._normalize_opacity_tensor(preds[self.opacity_key], depth)
+        ray_dirs = self._normalize_ray_directions(preds[self.ray_directions_key])
+        cam_trans = preds[self.cam_trans_key]
+        cam_quats = preds[self.cam_quats_key]
+
+        if cam_trans.dim() != 3 or cam_trans.shape[-1] != 3:
+            raise ValueError(
+                f"Camera translations must have shape (B, V, 3); received {tuple(cam_trans.shape)}"
+            )
+        if cam_quats.dim() != 3 or cam_quats.shape[-1] != 4:
+            raise ValueError(
+                f"Camera quaternions must have shape (B, V, 4); received {tuple(cam_quats.shape)}"
+            )
+
+        time_samples = preds.get(self.time_samples_key)
+
+        flat_quats = cam_quats.view(batch_size * num_views, 4)
+        flat_trans = cam_trans.view(batch_size * num_views, 3)
+        cam_pose = self._pose_from_quat_and_trans(flat_quats, flat_trans)
+        world2cam = closed_form_pose_inverse(cam_pose).view(batch_size, num_views, 4, 4)
+
+        flat_ray_dirs = ray_dirs.view(batch_size * num_views, height, width, 3)
+        intrinsics = recover_pinhole_intrinsics_from_ray_directions(flat_ray_dirs)
+        intrinsics = intrinsics.view(batch_size, num_views, 3, 3)
+
+        dataset_mask = None
+        if self.valid_mask_key and self.valid_mask_key in batch:
+            dataset_mask = batch[self.valid_mask_key]
+            if dataset_mask.dim() == 5 and dataset_mask.shape[-1] == 1:
+                dataset_mask = dataset_mask.squeeze(-1)
+            if dataset_mask.dim() != 4:
+                raise ValueError(
+                    f"Dataset mask must be shaped (B, V, H, W); received {tuple(dataset_mask.shape)}"
+                )
+
+        images = images.float()
+        timestamps = timestamps.float().to(images.device)
+
+        losses = []
+        details = {}
+        view_loss_values = []
+        self_name = type(self).__name__
+
+        for b_idx in range(batch_size):
+            for v_idx in range(num_views):
+                reconstruction, valid_mask = self._render_view(
+                    batch_idx=b_idx,
+                    target_idx=v_idx,
+                    target_time=timestamps[b_idx, v_idx],
+                    images=images,
+                    depth=depth,
+                    opacity=opacity,
+                    ray_dirs=ray_dirs,
+                    cam_trans=cam_trans,
+                    cam_quats=cam_quats,
+                    intrinsics=intrinsics,
+                    world2cam=world2cam,
+                    time_samples=time_samples,
+                )
+
+                target_img = images[b_idx, v_idx]
+                per_pixel_loss = self.criterion(
+                    reconstruction.unsqueeze(0), target_img.unsqueeze(0)
+                )
+                if per_pixel_loss.dim() == 4:
+                    per_pixel_loss = per_pixel_loss.mean(dim=1)
+                per_pixel_loss = per_pixel_loss.squeeze(0)
+
+                if dataset_mask is not None:
+                    valid_mask = valid_mask & dataset_mask[b_idx, v_idx].bool()
+
+                if not torch.any(valid_mask):
+                    loss_map = torch.zeros_like(per_pixel_loss)
+                else:
+                    loss_map = torch.where(valid_mask, per_pixel_loss, torch.zeros_like(per_pixel_loss))
+                    view_loss = loss_map[valid_mask].mean()
+                    view_loss_values.append(float(view_loss))
+                    details[f"{self_name}_view{b_idx * num_views + v_idx + 1}"] = float(
+                        view_loss
+                    )
+
+                losses.append((loss_map, valid_mask, "photometric"))
+
+        if view_loss_values:
+            details[f"{self_name}_avg"] = sum(view_loss_values) / len(view_loss_values)
+
+        return Sum(*losses), details
 
 
 class ExcludeTopNPercentPixelLoss(MultiLoss):
