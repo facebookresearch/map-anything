@@ -81,6 +81,7 @@ from uniception.models.prediction_heads.dpt import DPTFeature, DPTRegressionProc
 from uniception.models.prediction_heads.linear import LinearFeature
 from uniception.models.prediction_heads.mlp_head import MLPHead
 from uniception.models.prediction_heads.pose_head import PoseHead
+from morphcloud.models.morphcloud.opacity_head import OpacityHead, OpacityHeadOutput
 
 # Enable TF32 precision if supported (for GPU >= Ampere and PyTorch >= 1.12)
 if hasattr(torch.backends.cuda, "matmul") and hasattr(
@@ -358,6 +359,10 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             pred_head_config["regressor_head"]["input_feature_dim"] = pred_head_config[
                 "feature_head"
             ]["feature_dim"]
+            if pred_head_config.get("opacity_head") is not None:
+                pred_head_config["opacity_head"]["input_dim"] = pred_head_config[
+                    "regressor_head"
+                ]["input_feature_dim"]
             # Add dependencies for Pose head if required
             if "pose" in self.pred_head_type:
                 pred_head_config["pose_head"]["patch_size"] = self.encoder.patch_size
@@ -371,6 +376,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         pred_head_config["scale_head"]["input_feature_dim"] = self.info_sharing.dim
 
         # Initialize Prediction Heads
+        self.opacity_head = None
         if self.pred_head_type == "linear":
             # Initialize Dense Prediction Head for all views
             self.dense_head = LinearFeature(**pred_head_config["feature_head"])
@@ -383,6 +389,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             self.dense_head = nn.Sequential(
                 self.dpt_feature_head, self.dpt_regressor_head
             )
+            if pred_head_config.get("opacity_head") is not None:
+                self.opacity_head = OpacityHead(**pred_head_config["opacity_head"])
             # Initialize Pose Head for all views if required
             if "pose" in self.pred_head_type:
                 self.pose_head = PoseHead(**pred_head_config["pose_head"])
@@ -1827,6 +1835,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         """
         Run the downstream dense prediction head
         """
+        opacity_output: Optional[OpacityHeadOutput] = None
         if self.pred_head_type == "linear":
             dense_head_outputs = self.dense_head(
                 PredictionHeadInput(last_feature=dense_head_inputs)
@@ -1844,6 +1853,10 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                     target_output_shape=img_shape,
                 )
             )
+            if self.opacity_head is not None:
+                opacity_output = self.opacity_head(
+                    dense_head_outputs.decoded_channels
+                )
             dense_final_outputs = self.dense_adaptor(
                 AdaptorInput(
                     adaptor_feature=dense_head_outputs.decoded_channels,
@@ -1855,7 +1868,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                 f"Invalid pred_head_type: {self.pred_head_type}. Valid options: ['linear', 'dpt', 'dpt+pose']"
             )
 
-        return dense_final_outputs
+        return dense_final_outputs, opacity_output
 
     def downstream_head(
         self,
@@ -1872,6 +1885,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
 
         # Use mini-batch inference to run the dense prediction head (the memory bottleneck)
         # This saves memory and is slower than running the dense prediction head in one go
+        opacity_final_output: Optional[OpacityHeadOutput] = None
         if memory_efficient_inference:
             # Obtain the batch size of the dense head inputs
             if self.pred_head_type == "linear":
@@ -1890,6 +1904,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             # Run prediction for each mini-batch
             dense_final_outputs_list = []
             pose_final_outputs_list = [] if self.pred_head_type == "dpt+pose" else None
+            opacity_outputs_list = [] if self.opacity_head is not None else None
             for batch_idx in range(num_batches):
                 start_idx = batch_idx * minibatch
                 end_idx = min((batch_idx + 1) * minibatch, batch_size)
@@ -1907,10 +1922,18 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                     )
 
                 # Dense prediction (mini-batched)
-                dense_final_outputs_batch = self.downstream_dense_head(
+                (
+                    dense_final_outputs_batch,
+                    opacity_output_batch,
+                ) = self.downstream_dense_head(
                     dense_head_inputs_batch, img_shape
                 )
                 dense_final_outputs_list.append(dense_final_outputs_batch)
+                if (
+                    opacity_outputs_list is not None
+                    and opacity_output_batch is not None
+                ):
+                    opacity_outputs_list.append(opacity_output_batch)
 
                 # Pose prediction (mini-batched)
                 if self.pred_head_type == "dpt+pose":
@@ -1953,13 +1976,24 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                     **pose_pred_data_dict
                 )
 
+            if opacity_outputs_list:
+                opacity_prob = torch.cat(
+                    [output.probability for output in opacity_outputs_list], dim=0
+                )
+                opacity_logits = torch.cat(
+                    [output.logits for output in opacity_outputs_list], dim=0
+                )
+                opacity_final_output = OpacityHeadOutput(
+                    probability=opacity_prob, logits=opacity_logits
+                )
+
             # Clear CUDA cache for better memory efficiency
             if device.type == "cuda":
                 torch.cuda.empty_cache()
         else:
             # Run prediction for all (batch_size * num_views) in one go
             # Dense prediction
-            dense_final_outputs = self.downstream_dense_head(
+            dense_final_outputs, opacity_final_output = self.downstream_dense_head(
                 dense_head_inputs, img_shape
             )
 
@@ -1992,7 +2026,12 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         if memory_efficient_inference and device.type == "cuda":
             torch.cuda.empty_cache()
 
-        return dense_final_outputs, pose_final_outputs, scale_final_output
+        return (
+            dense_final_outputs,
+            pose_final_outputs,
+            scale_final_output,
+            opacity_final_output,
+        )
 
     def forward(self, views, memory_efficient_inference=False):
         """
@@ -2127,16 +2166,29 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             )
 
             # Run the downstream heads
-            dense_final_outputs, pose_final_outputs, scale_final_output = (
-                self.downstream_head(
-                    dense_head_inputs=dense_head_inputs,
-                    scale_head_inputs=scale_head_inputs,
-                    img_shape=img_shape,
-                    memory_efficient_inference=memory_efficient_inference,
-                )
+            (
+                dense_final_outputs,
+                pose_final_outputs,
+                scale_final_output,
+                opacity_outputs,
+            ) = self.downstream_head(
+                dense_head_inputs=dense_head_inputs,
+                scale_head_inputs=scale_head_inputs,
+                img_shape=img_shape,
+                memory_efficient_inference=memory_efficient_inference,
             )
 
             # Prepare the final scene representation for all views
+            opacity_per_view = None
+            opacity_logits_per_view = None
+            if opacity_outputs is not None:
+                opacity_prob = opacity_outputs.probability.permute(0, 2, 3, 1)
+                opacity_logits = opacity_outputs.logits.permute(0, 2, 3, 1)
+                opacity_prob = opacity_prob.squeeze(-1).contiguous()
+                opacity_logits = opacity_logits.squeeze(-1).contiguous()
+                opacity_per_view = opacity_prob.chunk(num_views, dim=0)
+                opacity_logits_per_view = opacity_logits.chunk(num_views, dim=0)
+
             if self.scene_rep_type in [
                 "pointmap",
                 "pointmap+confidence",
@@ -2390,6 +2442,11 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                                     'pointmap+confidence+mask', 'raymap+depth+confidence+mask', 'raydirs+depth+pose+confidence+mask', 'campointmap+pose+confidence+mask', 'pointmap+raydirs+depth+pose+confidence+mask']"
                 )
 
+            if opacity_per_view is not None:
+                for i in range(num_views):
+                    res[i]["opacity"] = opacity_per_view[i]
+                    res[i]["opacity_logits"] = opacity_logits_per_view[i]
+
             # Get the output confidences for all views (if available) and add them to the result
             if "confidence" in self.scene_rep_type:
                 output_confidences = dense_final_outputs.confidence
@@ -2556,6 +2613,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                 - 'mask': torch.Tensor of shape (B, H, W, 1) - combo of non-ambiguous mask, edge mask and confidence-based mask if used
                 - 'non_ambiguous_mask': torch.Tensor of shape (B, H, W) - non-ambiguous mask
                 - 'non_ambiguous_mask_logits': torch.Tensor of shape (B, H, W) - non-ambiguous mask logits
+                - 'opacity': torch.Tensor of shape (B, H, W) - per-pixel opacity prior
+                - 'opacity_logits': torch.Tensor of shape (B, H, W) - raw opacity logits
                 - 'conf': torch.Tensor of shape (B, H, W) - confidence
 
         Raises:

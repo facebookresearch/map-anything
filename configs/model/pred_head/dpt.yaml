@@ -9,6 +9,8 @@ feature_head:
 regressor_head:
   output_dim: ${model.pred_head.adaptor_config.input_dim}
   checkpoint_gradient: ${model.pred_head.gradient_checkpointing}
+opacity_head:
+  hidden_dim: 128
 adaptor_type: ${model.pred_head.adaptor_config.type}
 adaptor: ${model.pred_head.adaptor_config.init_dict}
 # Flag to indicate whether to use gradient checkpointing
