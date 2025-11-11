@@ -817,12 +817,124 @@ class ConfLoss(MultiLoss):
         return total_loss, dict(**conf_loss_details, **pixel_loss_details)
 
 
+class SSIMLoss(BaseCriterion):
+    """Structural Similarity Index based loss.
+
+    This implementation follows the standard SSIM formulation using a
+    Gaussian window and returns ``1 - SSIM`` as the loss value. The loss can
+    operate on tensors with arbitrary leading batch dimensions as long as the
+    last three dimensions correspond to ``(C, H, W)``. Reduction modes follow
+    the behaviour of :class:`BaseCriterion`.
+    """
+
+    def __init__(
+        self,
+        window_size=11,
+        sigma=1.5,
+        data_range=1.0,
+        k1=0.01,
+        k2=0.03,
+        reduction="mean",
+    ):
+        super().__init__(reduction)
+        self.window_size = window_size
+        self.sigma = sigma
+        self.data_range = data_range
+        self.k1 = k1
+        self.k2 = k2
+
+    def _create_window(self, size, channel, device, dtype):
+        sigma = self.sigma if self.sigma is not None else max(size / 6.0, 1e-6)
+        coords = torch.arange(size, device=device, dtype=dtype) - size // 2
+        gauss = torch.exp(-(coords**2) / (2 * sigma**2))
+        gauss = gauss / gauss.sum()
+        window_2d = gauss[:, None] @ gauss[None, :]
+        window = window_2d.unsqueeze(0).unsqueeze(0)
+        window = window.expand(channel, 1, size, size).contiguous()
+        return window
+
+    def forward(self, prediction, reference):
+        if prediction.shape != reference.shape:
+            raise ValueError(
+                "SSIMLoss expects prediction and reference to share the same shape; "
+                f"received {tuple(prediction.shape)} vs {tuple(reference.shape)}"
+            )
+        if prediction.ndim < 4:
+            raise ValueError(
+                "SSIMLoss expects inputs with shape (..., C, H, W); "
+                f"received {prediction.ndim} dimensions"
+            )
+
+        *batch_dims, channels, height, width = prediction.shape
+        if channels < 1:
+            raise ValueError("SSIMLoss requires at least one channel in the input tensor")
+
+        pred = prediction.reshape(-1, channels, height, width)
+        ref = reference.reshape(-1, channels, height, width)
+
+        window_size = min(self.window_size, height, width)
+        if window_size % 2 == 0 and window_size > 1:
+            window_size -= 1
+        window_size = max(window_size, 1)
+        padding = window_size // 2 if window_size > 1 else 0
+
+        window = self._create_window(window_size, channels, pred.device, pred.dtype)
+
+        mu_pred = F.conv2d(pred, window, padding=padding, groups=channels)
+        mu_ref = F.conv2d(ref, window, padding=padding, groups=channels)
+
+        mu_pred_sq = mu_pred.pow(2)
+        mu_ref_sq = mu_ref.pow(2)
+        mu_pred_ref = mu_pred * mu_ref
+
+        sigma_pred_sq = F.conv2d(pred * pred, window, padding=padding, groups=channels) - mu_pred_sq
+        sigma_ref_sq = F.conv2d(ref * ref, window, padding=padding, groups=channels) - mu_ref_sq
+        sigma_pred_ref = F.conv2d(pred * ref, window, padding=padding, groups=channels) - mu_pred_ref
+
+        sigma_pred_sq = torch.clamp(sigma_pred_sq, min=0.0)
+        sigma_ref_sq = torch.clamp(sigma_ref_sq, min=0.0)
+
+        if self.data_range is None:
+            max_vals = torch.stack(
+                [pred.amax(dim=(1, 2, 3)), ref.amax(dim=(1, 2, 3))]
+            ).amax(dim=0)
+            min_vals = torch.stack(
+                [pred.amin(dim=(1, 2, 3)), ref.amin(dim=(1, 2, 3))]
+            ).amin(dim=0)
+            data_range = (max_vals - min_vals).view(-1, 1, 1, 1)
+        else:
+            data_range = torch.as_tensor(
+                self.data_range, device=pred.device, dtype=pred.dtype
+            ).view(1, 1, 1, 1)
+
+        data_range = torch.clamp(data_range, min=1e-6)
+        c1 = (self.k1 * data_range) ** 2
+        c2 = (self.k2 * data_range) ** 2
+
+        numerator = (2 * mu_pred_ref + c1) * (2 * sigma_pred_ref + c2)
+        denominator = (mu_pred_sq + mu_ref_sq + c1) * (sigma_pred_sq + sigma_ref_sq + c2)
+        ssim_map = numerator / denominator.clamp_min(1e-6)
+        ssim_map = torch.mean(ssim_map, dim=1, keepdim=True)
+        ssim_map = torch.clamp(ssim_map, -1.0, 1.0)
+
+        loss_map = torch.clamp(1.0 - ssim_map, min=0.0)
+        loss_map = loss_map.view(*batch_dims, 1, height, width)
+
+        if self.reduction == "none":
+            return loss_map.squeeze(-3)
+        if self.reduction == "sum":
+            return loss_map.sum()
+        if self.reduction == "mean":
+            return loss_map.mean() if loss_map.numel() > 0 else loss_map.new_zeros(())
+        raise ValueError(f"Unsupported reduction mode: {self.reduction}")
+
+
 class PhotometricReprojectionLoss(Criterion, MultiLoss):
     """Differentiable multi-view photometric loss that fuses cross-view geometry."""
 
     def __init__(
         self,
-        criterion,
+        criterion=None,
         depth_key="depth_along_ray",
         ray_directions_key="ray_directions",
         cam_trans_key="cam_trans",
@@ -837,7 +949,9 @@ class PhotometricReprojectionLoss(Criterion, MultiLoss):
         """Initialise the photometric reprojection loss.
 
         Args:
-            criterion (BaseCriterion): Base photometric criterion operating on per-pixel colours.
+            criterion (BaseCriterion, optional): Base photometric criterion operating on
+                per-pixel colours. Defaults to :class:`SSIMLoss` which minimises
+                ``1 - SSIM`` between reconstructed and target pixels.
             depth_key (str): Key pointing to per-view depth predictions of shape ``(B, V, T, H, W)``.
             ray_directions_key (str): Key for per-view ray directions of shape ``(B, V, H, W, 3)``.
             cam_trans_key (str): Key for camera translation predictions of shape ``(B, V, 3)``.
@@ -850,7 +964,7 @@ class PhotometricReprojectionLoss(Criterion, MultiLoss):
             min_depth (float): Minimum valid depth used to reject invalid projections.
         """
 
-        super().__init__(criterion)
+        super().__init__(SSIMLoss() if criterion is None else criterion)
         self.depth_key = depth_key
         self.ray_directions_key = ray_directions_key
         self.cam_trans_key = cam_trans_key
