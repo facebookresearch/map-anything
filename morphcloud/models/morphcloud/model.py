@@ -654,13 +654,13 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         all_encoder_features_across_views = encoder_output.features
 
         # Add time index positional encoding to each token before splitting views
-        time_index_features = self._compute_time_index_features(
+        frame_index_features = self._compute_frame_index_features(
             views, all_encoder_features_across_views
         )
-        if time_index_features is not None:
+        if frame_index_features is not None:
             all_encoder_features_across_views = (
                 all_encoder_features_across_views
-                + time_index_features.unsqueeze(-1).unsqueeze(-1)
+                + frame_index_features.unsqueeze(-1).unsqueeze(-1)
             )
 
         all_encoder_features_across_views = all_encoder_features_across_views.chunk(
@@ -669,7 +669,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
 
         return all_encoder_features_across_views
 
-    def _compute_time_index_features(
+    def _compute_frame_index_features(
         self,
         views: List[Dict[str, Any]],
         encoder_features: torch.Tensor,
@@ -697,41 +697,41 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
 
         for view in views:
             batch_size = view["img"].shape[0]
-            time_index_value = view.get("time_index", None)
+            frame_index_value = view.get("frame_index", None)
 
-            if time_index_value is None:
-                time_index_tensor = torch.zeros(
+            if frame_index_value is None:
+                frame_index_tensor = torch.zeros(
                     batch_size, device=device, dtype=dtype
                 )
             else:
-                if torch.is_tensor(time_index_value):
-                    time_index_tensor = time_index_value
+                if torch.is_tensor(frame_index_value):
+                    frame_index_tensor = frame_index_value
                 else:
-                    time_index_tensor = torch.as_tensor(time_index_value)
+                    frame_index_tensor = torch.as_tensor(frame_index_value)
 
-                if time_index_tensor.ndim == 0:
-                    time_index_tensor = time_index_tensor.expand(batch_size)
-                elif time_index_tensor.ndim == 1 and time_index_tensor.shape[0] == 1:
-                    time_index_tensor = time_index_tensor.expand(batch_size)
-                elif time_index_tensor.ndim > 1:
-                    time_index_tensor = time_index_tensor.reshape(batch_size, -1)
-                    if time_index_tensor.shape[1] != 1:
+                if frame_index_tensor.ndim == 0:
+                    frame_index_tensor = frame_index_tensor.expand(batch_size)
+                elif frame_index_tensor.ndim == 1 and frame_index_tensor.shape[0] == 1:
+                    frame_index_tensor = frame_index_tensor.expand(batch_size)
+                elif frame_index_tensor.ndim > 1:
+                    frame_index_tensor = frame_index_tensor.reshape(batch_size, -1)
+                    if frame_index_tensor.shape[1] != 1:
                         raise ValueError(
-                            "time_index tensors must be scalar per-sample values."
+                            "frame_index tensors must be scalar per-sample values."
                         )
-                    time_index_tensor = time_index_tensor.squeeze(-1)
+                    frame_index_tensor = frame_index_tensor.squeeze(-1)
 
-                if time_index_tensor.shape[0] != batch_size:
-                    if time_index_tensor.shape[0] == 1:
-                        time_index_tensor = time_index_tensor.expand(batch_size)
+                if frame_index_tensor.shape[0] != batch_size:
+                    if frame_index_tensor.shape[0] == 1:
+                        frame_index_tensor = frame_index_tensor.expand(batch_size)
                     else:
                         raise ValueError(
-                            "time_index tensor batch dimension must match view batch size."
+                            "frame_index tensor batch dimension must match view batch size."
                         )
 
-                time_index_tensor = time_index_tensor.to(device=device, dtype=dtype)
+                frame_index_tensor = frame_index_tensor.to(device=device, dtype=dtype)
 
-            time_indices_per_view.append(time_index_tensor)
+            time_indices_per_view.append(frame_index_tensor)
 
         if not time_indices_per_view:
             return None
@@ -2647,11 +2647,15 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                 "data_norm_type",
             ]
         )
+        
         for view in validated_views:
             for name in view.keys():
                 if name in ignore_keys:
                     continue
-                view[name] = view[name].to(self.device, non_blocking=True)
+                elif name == 'frame_index':
+                    view[name] = view[name]  # Keep as is (int)
+                else:
+                    view[name] = view[name].to(self.device, non_blocking=True)
 
         # Pre-process the input views
         processed_views = preprocess_input_views_for_inference(validated_views)
@@ -2672,7 +2676,6 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             )
 
         # Post-process the model outputs
-        import pdb; pdb.set_trace()
         preds = postprocess_model_outputs_for_inference(
             raw_outputs=preds,
             input_views=processed_views,

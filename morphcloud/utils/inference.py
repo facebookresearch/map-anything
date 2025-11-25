@@ -36,6 +36,7 @@ ALLOWED_VIEW_KEYS = {
     "true_shape",  # Optional - original image shape
     "idx",  # Optional - index of the view
     "instance",  # Optional - instance info of the view
+    "frame_index",  # Optional - time index of the view
 }
 
 REQUIRED_KEYS = {"img", "data_norm_type"}
