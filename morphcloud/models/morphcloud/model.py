@@ -2672,6 +2672,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             )
 
         # Post-process the model outputs
+        import pdb; pdb.set_trace()
         preds = postprocess_model_outputs_for_inference(
             raw_outputs=preds,
             input_views=processed_views,
