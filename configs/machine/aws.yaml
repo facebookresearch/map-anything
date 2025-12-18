@@ -2,14 +2,14 @@ defaults:
   - default
 
 # Root directory containing all datasets
-root_data_dir: "/fsx/xrtech/data"
+root_data_dir: "/ai4rl/fsx/xrtech/data"
 # Dataset metadata directory
-mapanything_dataset_metadata_dir: "/fsx/nkeetha/mapanything_dataset_metadata"
+mapanything_dataset_metadata_dir: "/ai4rl/fsx/nkeetha/mapanything_dataset_metadata"
 # Root directory containing pretrained checkpoints for custom models
-root_pretrained_checkpoints_dir: "/fsx/nkeetha/mapanything_checkpoints"
+root_pretrained_checkpoints_dir: "/ai4rl/fsx/nkeetha/mapanything_checkpoints"
 # Root directory to log experiments
-root_experiments_dir: "/fsx/nkeetha/experiments"
+root_experiments_dir: "/ai4rl/fsx/nkeetha/experiments"
 # Root directory containing UniCeption pretrained checkpoints
-root_uniception_pretrained_checkpoints_dir: "/fsx/nkeetha/uniception_checkpoints"
+root_uniception_pretrained_checkpoints_dir: "/ai4rl/fsx/nkeetha/uniception_checkpoints"
 # Root directory containing external benchmark data
-external_benchmark_data_root_data_dir: "/fsx/xrtech/external_benchmark_data/rmvd_mvs_benchmark/rmvd_test_data"
+external_benchmark_data_root_data_dir: "/ai4rl/fsx/xrtech/external_benchmark_data/rmvd_mvs_benchmark/rmvd_test_data"

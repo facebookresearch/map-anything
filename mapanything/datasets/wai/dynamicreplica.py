@@ -157,12 +157,12 @@ def get_parser():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-rd", "--root_dir", default="/fsx/xrtech/data/dynamicreplica", type=str
+        "-rd", "--root_dir", default="/ai4rl/fsx/xrtech/data/dynamicreplica", type=str
     )
     parser.add_argument(
         "-dmd",
         "--dataset_metadata_dir",
-        default="/fsx/nkeetha/mapanything_dataset_metadata",
+        default="/ai4rl/fsx/nkeetha/mapanything_dataset_metadata",
         type=str,
     )
     parser.add_argument(

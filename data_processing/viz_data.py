@@ -162,7 +162,7 @@ def get_dataset_config(dataset_type):
     """
     configs = {
         "scannetpp": {
-            "root_dir": "/fsx/xrtech/data/scannetppv2",
+            "root_dir": "/ai4rl/fsx/xrtech/data/scannetppv2",
             "scene": "0a5c013435",
             "depth_key": "rendered_depth",
             "local_frame": False,
@@ -172,7 +172,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "blendedmvs": {
-            "root_dir": "/fsx/xrtech/data/blendedmvs",
+            "root_dir": "/ai4rl/fsx/xrtech/data/blendedmvs",
             "scene": "584b9a747072670e72bfc49d",
             "depth_key": "depth",
             "local_frame": False,
@@ -182,7 +182,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "eth3d": {
-            "root_dir": "/fsx/xrtech/data/eth3d",
+            "root_dir": "/ai4rl/fsx/xrtech/data/eth3d",
             "scene": "delivery_area",
             "depth_key": "depth",
             "local_frame": False,
@@ -192,7 +192,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "megadepth": {
-            "root_dir": "/fsx/xrtech/data/megadepth",
+            "root_dir": "/ai4rl/fsx/xrtech/data/megadepth",
             "scene": "0000_1",
             # "scene": "0086_0", # Disjoint reconstructions with different scale
             "depth_key": "depth",
@@ -203,7 +203,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "spring": {
-            "root_dir": "/fsx/xrtech/data/spring",
+            "root_dir": "/ai4rl/fsx/xrtech/data/spring",
             "scene": "0004",
             "depth_key": "depth",
             "local_frame": False,
@@ -213,7 +213,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "mpsd": {
-            "root_dir": "/fsx/xrtech/data/mpsd",
+            "root_dir": "/ai4rl/fsx/xrtech/data/mpsd",
             "scene": "geoeven_4_2019-03-19T11_33_14.019516",
             "depth_key": "depth",
             "local_frame": False,
@@ -223,7 +223,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "tav2": {
-            "root_dir": "/fsx/xrtech/data/tav2_wb",
+            "root_dir": "/ai4rl/fsx/xrtech/data/tav2_wb",
             "scene": "PolarSciFi",
             "depth_key": "depth",
             "local_frame": False,
@@ -233,7 +233,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "ase": {
-            "root_dir": "/fsx/xrtech/data/ase",
+            "root_dir": "/ai4rl/fsx/xrtech/data/ase",
             "scene": "10000",
             "depth_key": "depth",
             "local_frame": False,
@@ -243,7 +243,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "dl3dv": {
-            "root_dir": "/fsx/xrtech/data/dl3dv",
+            "root_dir": "/ai4rl/fsx/xrtech/data/dl3dv",
             "scene": "9K_963080e5ee7ca52ee8fabd294ad9e12220ed5064686ec9786a17aed23da8850f",
             "depth_key": "pred_depth/mvsanywhere",
             "local_frame": False,
@@ -253,7 +253,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.25,
         },
         "unrealstereo4k": {
-            "root_dir": "/fsx/xrtech/data/unrealstereo4k",
+            "root_dir": "/ai4rl/fsx/xrtech/data/unrealstereo4k",
             "scene": "00000",
             "depth_key": "depth",
             "local_frame": False,
@@ -263,7 +263,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "mvs_synth": {
-            "root_dir": "/fsx/xrtech/data/mvs_synth",
+            "root_dir": "/ai4rl/fsx/xrtech/data/mvs_synth",
             "scene": "0000",
             "depth_key": "depth",
             "local_frame": False,
@@ -273,7 +273,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "paralleldomain4d": {
-            "root_dir": "/fsx/xrtech/data/paralleldomain4d",
+            "root_dir": "/ai4rl/fsx/xrtech/data/paralleldomain4d",
             "scene": "scene_000000",
             "depth_key": "depth",
             "local_frame": False,
@@ -283,7 +283,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "sailvos3d": {
-            "root_dir": "/fsx/xrtech/data/sailvos3d",
+            "root_dir": "/ai4rl/fsx/xrtech/data/sailvos3d",
             "scene": "fam_6_mcs_5",
             "depth_key": "depth",
             "local_frame": False,
@@ -293,7 +293,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "dynamicreplica": {
-            "root_dir": "/fsx/xrtech/data/dynamicreplica",
+            "root_dir": "/ai4rl/fsx/xrtech/data/dynamicreplica",
             "scene": "26dd2c-3_obj_source",
             # "scene": "009850-3_obj_source", # Part of the floor depth is wrong
             "depth_key": "depth",
@@ -317,7 +317,7 @@ def get_parser():
         "--root_dir",
         type=str,
         help="Path to the root directory",
-        default="/fsx/xrtech/data/eth3d",
+        default="/ai4rl/fsx/xrtech/data/eth3d",
     )
     parser.add_argument(
         "--scene", type=str, help="Scene to visualize", default="courtyard"

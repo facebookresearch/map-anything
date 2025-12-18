@@ -525,19 +525,19 @@ def main():
         "--wai_root",
         type=str,
         help="Path to the root of WAI format datasets",
-        default="/fsx/xrtech/data",
+        default="/ai4rl/fsx/xrtech/data",
     )
     parser.add_argument(
         "--raw_data_root",
         type=str,
         help="Path to the root of raw datasets from WAI is processed",
-        default="/fsx/xrtech/raw_data",
+        default="/ai4rl/fsx/xrtech/raw_data",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
         help="Path to the output directory",
-        default="/fsx/nkeetha/mapanything_dataset_metadata",
+        default="/ai4rl/fsx/nkeetha/mapanything_dataset_metadata",
     )
     parser.add_argument(
         "--datasets",

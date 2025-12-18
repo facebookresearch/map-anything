@@ -76,6 +76,10 @@ MODEL_CONFIGS = {
         "module": "mapanything.models.external.anycalib",
         "class_name": "AnyCalibWrapper",
     },
+    "da3": {
+        "module": "mapanything.models.external.da3",
+        "class_name": "DA3Wrapper",
+    },
     "dust3r": {
         "module": "mapanything.models.external.dust3r",
         "class_name": "DUSt3RBAWrapper",
