@@ -117,17 +117,17 @@ cd <path to map-anything>
 
 # Run conversion
 python -m wai_processing.scripts.conversion.eth3d \
-          original_root="/fsx/xrtech/dryrun_tmp/eth3d_raw" \
-          root="/fsx/xrtech/dryrun_tmp/eth3d"
+          original_root="/ai4rl/fsx/xrtech/dryrun_tmp/eth3d_raw" \
+          root="/ai4rl/fsx/xrtech/dryrun_tmp/eth3d"
 
 # Run covisibility
 python -m wai_processing.scripts.covisibility \
           data_processing/wai_processing/configs/covisibility/covisibility_gt_depth_224x224.yaml \
-          root="/fsx/xrtech/dryrun_tmp/eth3d"
+          root="/ai4rl/fsx/xrtech/dryrun_tmp/eth3d"
 
 # Run moge
 python -m wai_processing.scripts.run_moge \
-          root="/fsx/xrtech/dryrun_tmp/eth3d" \
+          root="/ai4rl/fsx/xrtech/dryrun_tmp/eth3d" \
           batch_size=1 # MoGe stage doesn't support nested tensors
 ```
 

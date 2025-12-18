@@ -36,18 +36,28 @@ For quick experimentation, we provide a single dataset example using BlendedMVS 
 All original training bash scripts are available in `bash_scripts/train/`. The main models from the paper can be reproduced using:
 
 ```bash
-# Stage 1: 4-view training
-bash bash_scripts/train/main/mapa_curri_4v_13d_48ipg_64g.sh 8
+# Stage 1: 4-view training - 8 Nodes
+bash bash_scripts/train/main/mapa_curri_4v_13d_36ipg_64g.sh 8
 
-# Stage 2: 24-view training
-bash bash_scripts/train/main/mapa_curri_24v_13d_48ipg_64g.sh 8
+# Stage 2: 24-view training - 8 Nodes
+bash bash_scripts/train/main/mapa_curri_24v_13d_36ipg_64g.sh 8
 
-# Likewise for Apache 2.0 licensed variants
-bash bash_scripts/train/main/mapa_curri_4v_6d_48ipg_8g_apache.sh 8
-bash bash_scripts/train/main/mapa_curri_24v_6d_48ipg_64g_apache.sh 8
+# Likewise for Apache 2.0 licensed variants - 8 Nodes
+bash bash_scripts/train/main/mapa_curri_4v_6d_36ipg_64g_apache.sh 8
+bash bash_scripts/train/main/mapa_curri_24v_6d_36ipg_64g_apache.sh 8
 ```
 
 Update the machine configuration in `configs/machine/your_machine.yaml` and adjust paths in the bash scripts before execution.
+
+### Note regarding DINO initialization
+
+We use DINO init for the multi-view transformer and the default training config expects weights to be present at `${machine.root_pretrained_checkpoints_dir}/aat_init_w_dinov2_vitg_layers_24_to_40.pth`.
+
+The DINO init multi-view transformer checkpoint can be generated and saved to `${machine.root_pretrained_checkpoints_dir}/aat_init_w_dinov2_vitg_layers_24_to_40.pth` using [UniCeption](https://github.com/castacks/UniCeption/tree/main):
+
+```bash
+python3 scripts/convert_dino_to_info_sharing.py --output_path ${machine.root_pretrained_checkpoints_dir}/aat_init_w_dinov2_vitg_layers_24_to_40.pth --start 24 --encoder_str dinov2_giant --info_sharing_class alternating
+```
 
 ## Paper Ablations
 

@@ -1,6 +1,6 @@
 root: # needs to be set via argument: root=<wai_dataset_root_path>
 
-model_path: /fsx/xrtech/checkpoints/MoGe/moge-2-vitl-normal/model.pt
+model_path: /ai4rl/fsx/xrtech/checkpoints/MoGe/moge-2-vitl-normal/model.pt
 model_name: moge2
 out_path: moge/v0
 device: cuda
@@ -16,7 +16,7 @@ batch_size: 8
 prefetch_factor: 6
 num_workers: 6
 
-resize: 1600 # the maximum long-size resizing length 
+resize: 1600 # the maximum long-size resizing length
 # inference speed / results. check 'moge infer --help'
 resolution_level: 9
 

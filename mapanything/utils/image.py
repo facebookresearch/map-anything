@@ -62,12 +62,25 @@ RESOLUTION_MAPPINGS = {
         0.562: (288, 512),  # 9:16
         0.500: (256, 512),  # 1:2
     },
+    504: {
+        1.000: (504, 504),  # 1:1
+        1.333: (504, 378),  # 4:3
+        1.565: (504, 322),  # 3:2
+        1.800: (504, 280),  # 16:9
+        2.118: (504, 238),  # 2:1
+        3.273: (504, 154),  # 3.2:1
+        0.750: (378, 504),  # 3:4
+        0.639: (322, 504),  # 2:3
+        0.556: (280, 504),  # 9:16
+        0.472: (238, 504),  # 1:2
+    },
 }
 
 # Precomputed sorted aspect ratio keys for efficient lookup
 ASPECT_RATIO_KEYS = {
     518: sorted(RESOLUTION_MAPPINGS[518].keys()),
     512: sorted(RESOLUTION_MAPPINGS[512].keys()),
+    504: sorted(RESOLUTION_MAPPINGS[504].keys()),
 }
 
 

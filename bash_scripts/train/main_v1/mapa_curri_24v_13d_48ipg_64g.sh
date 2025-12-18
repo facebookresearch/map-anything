@@ -40,14 +40,15 @@ torchrun --nproc_per_node ${NUM_GPUS} --nnodes ${NUM_NODES} --node_rank ${NODE_R
     scripts/train.py \
     machine=aws \
     dataset=megatrain_13d_518_many_ar_48ipg_64g dataset.num_workers=12 \
-    dataset.num_views=4 \
+    dataset.num_views=24 \
     loss=overall_loss_weigh_pm_higher \
-    model=mapanything \
+    model=mapanything_v1 \
     model/task=aug_training \
     model.encoder.gradient_checkpointing=true \
-    train_params=lower_encoder_lr_64g \
-    train_params.epochs=100 \
-    train_params.warmup_epochs=10 \
-    train_params.keep_freq=40 \
+    model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_4v_13d_48ipg_64g/checkpoint-last.pth' \
+    train_params=finetune_with_lower_encoder_lr_64g \
+    train_params.epochs=40 \
+    train_params.warmup_epochs=4 \
+    train_params.keep_freq=10 \
     train_params.max_num_of_imgs_per_gpu=48 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_4v_13d_48ipg_64g'
+    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_48ipg_64g'

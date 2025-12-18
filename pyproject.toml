@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mapanything"
-version = "1.0"
+version = "1.1"
 description = "Universal Feed-Forward Metric 3D Reconstruction"
 readme = "readme.md"
 authors = [{ name = "Nikhil Keetha", email = "keethanikhil@gmail.com" }]
@@ -18,12 +18,13 @@ dependencies = [
     "pillow-heif",
     "plyfile",
     "python-box",
+    "requests",
     "rerun-sdk~=0.24.1",
     "safetensors",
     "tensorboard",
     "tqdm",
     "trimesh",
-    "uniception",
+    "uniception==0.1.6",
 ]
 
 [project.optional-dependencies]
@@ -44,7 +45,7 @@ dust3r = [
 mast3r = ["mast3r @ git+https://github.com/Nik-V9/mast3r.git@main#egg=mast3r"]
 must3r = ["must3r @ git+https://github.com/naver/must3r.git@main#egg=must3r"]
 pow3r = ["pow3r @ git+https://github.com/Nik-V9/pow3r.git@main#egg=pow3r"]
-
+depth-anything-3 = ["depth-anything-3 @ git+https://github.com/Nik-V9/depth-anything-3.git@main#egg=depth-anything-3"]
 rmvd = ["rmvd @ git+https://github.com/infinity1096/robustmvd.git@master#egg=rmvd"]
 
 # Install all optional dependencies
@@ -52,6 +53,7 @@ all = [
     "mapanything[anycalib]",
     "mapanything[colmap]",
     "mapanything[data]",
+    "mapanything[depth-anything-3]",
     "mapanything[dev]",
     "mapanything[dust3r]",
     "mapanything[gradio]",
