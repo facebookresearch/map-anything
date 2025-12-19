@@ -39,16 +39,15 @@ torchrun --nproc_per_node ${NUM_GPUS} --nnodes ${NUM_NODES} --node_rank ${NODE_R
     --max-restarts ${MAX_RESTARTS} \
     scripts/train.py \
     machine=aws \
-    dataset=megatrain_6d_518_many_ar_48ipg_64g dataset.num_workers=12 \
-    dataset.num_views=24 \
-    loss=overall_loss_weigh_pm_higher \
-    model=mapanything \
+    dataset=megatrain_13d_518_many_ar_36ipg_64g dataset.num_workers=12 \
+    dataset.num_views=4 \
+    loss=overall_loss_highpm_plus_rel_pose \
+    model=mapanything_dino_init \
     model/task=aug_training \
     model.encoder.gradient_checkpointing=true \
-    model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_4v_6d_48ipg_8g_apache/checkpoint-last.pth' \
-    train_params=finetune_with_lower_encoder_lr_64g \
-    train_params.epochs=40 \
-    train_params.warmup_epochs=4 \
-    train_params.keep_freq=10 \
-    train_params.max_num_of_imgs_per_gpu=48 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_24v_6d_48ipg_64g_apache'
+    train_params=lower_encoder_lr_64g \
+    train_params.epochs=100 \
+    train_params.warmup_epochs=10 \
+    train_params.keep_freq=40 \
+    train_params.max_num_of_imgs_per_gpu=36 \
+    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_4v_13d_36ipg_64g'

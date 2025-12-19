@@ -1,0 +1,20 @@
+defaults:
+  - default
+  - encoder: dinov2_giant_24_layers
+  - info_sharing: aat_ifr_16_layers_dinov2_vitg_init
+  - pred_head: dpt_pose_scale
+  - task: images_only
+
+# String for model factory
+model_str: "mapanything"
+# Model config
+model_config:
+  name: "mapanything"
+  encoder_config: ${model.encoder}
+  info_sharing_config: ${model.info_sharing}
+  pred_head_config: ${model.pred_head}
+  geometric_input_config: ${model.task}
+  use_register_tokens_from_encoder: True
+  info_sharing_mlp_layer_str: "swiglufused"
+# Image Normalization Type
+data_norm_type: ${model.encoder.data_norm_type}

@@ -1,0 +1,18 @@
+# UniCeption encoder string used for selecting encoder class (python3 -m uniception.models.encoders.list)
+encoder_str: "dinov2"
+# Name of the encoder
+name: "dinov2_giant_24_layers"
+# Data normalization type
+data_norm_type: "dinov2"
+# ViT size
+size: "giant"
+# Registers
+with_registers: False
+# Flag to indicate whether model class uses torch hub
+uses_torch_hub: True
+# Flag to indicate whether to use gradient checkpointing for encoder
+gradient_checkpointing: False
+# Turn off final normalization so that the features can be passed to DINOv2 init multi-view transformer
+norm_returned_features: False
+# Keep only the first 24 layers of DINOv2 ViT-G (other 16 layers are in multi-view transformer)
+keep_first_n_layers: 24

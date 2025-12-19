@@ -1,0 +1,13 @@
+# String for model factory
+model_str: "da3"
+# Model config
+model_config:
+  name: "da3"
+  # HF model string
+  hf_model_name: "depth-anything/DA3-GIANT"
+# Image Normalization Type
+data_norm_type: "dinov2"
+# DA3 checkpoint is already loaded in the inference wrapper
+pretrained: null
+# Torch hub force reload
+torch_hub_force_reload: False

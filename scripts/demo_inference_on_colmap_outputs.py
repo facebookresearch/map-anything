@@ -184,7 +184,7 @@ def load_colmap_data(images_path, sparse_path, stride=1, verbose=False, ext=".bi
                 print(f"Warning: Failed to load data for {img_name}: {e}")
             processed_count += 1
             continue
-    
+
     # process unposed images (without COLMAP poses)
     for img_name in unposed_images:
         # Apply stride
@@ -221,7 +221,6 @@ def load_colmap_data(images_path, sparse_path, stride=1, verbose=False, ext=".bi
                 print(f"Warning: Failed to load data for {img_name}: {e}")
             processed_count += 1
             continue
-
 
     if not views_example:
         raise ValueError("No valid images found")

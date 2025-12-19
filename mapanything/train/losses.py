@@ -1987,6 +1987,7 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
         ray_directions_loss_weight=1,
         pose_quats_loss_weight=1,
         pose_trans_loss_weight=1,
+        compute_absolute_pose_loss=True,
         compute_pairwise_relative_pose_loss=False,
         convert_predictions_to_view0_frame=False,
         compute_world_frame_points_loss=True,
@@ -2021,6 +2022,7 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
             ray_directions_loss_weight (float): Weight to use for the ray directions loss. Default: 1.
             pose_quats_loss_weight (float): Weight to use for the pose quats loss. Default: 1.
             pose_trans_loss_weight (float): Weight to use for the pose trans loss. Default: 1.
+            compute_absolute_pose_loss (bool): If True, compute the absolute pose loss. Default: True.
             compute_pairwise_relative_pose_loss (bool): If True, the pose loss is computed on the
                 exhaustive pairwise relative poses. Default: False.
             convert_predictions_to_view0_frame (bool): If True, convert predictions to view0 frame.
@@ -2051,6 +2053,7 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
         self.ray_directions_loss_weight = ray_directions_loss_weight
         self.pose_quats_loss_weight = pose_quats_loss_weight
         self.pose_trans_loss_weight = pose_trans_loss_weight
+        self.compute_absolute_pose_loss = compute_absolute_pose_loss
         self.compute_pairwise_relative_pose_loss = compute_pairwise_relative_pose_loss
         self.convert_predictions_to_view0_frame = convert_predictions_to_view0_frame
         self.compute_world_frame_points_loss = compute_world_frame_points_loss
@@ -2419,7 +2422,168 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
                     gt_pts3d = apply_log_to_norm(gt_pts3d)
                     pred_pts3d = apply_log_to_norm(pred_pts3d)
 
-            if self.compute_pairwise_relative_pose_loss:
+            # Compute pose loss
+            if (
+                self.compute_absolute_pose_loss
+                and self.compute_pairwise_relative_pose_loss
+            ):
+                # Compute the absolute pose loss
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                abs_pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                abs_pose_trans_loss = abs_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                abs_pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                abs_pose_quats_loss = abs_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Compute the pairwise relative pose loss
+                # Get the inverse of current view predicted pose
+                pred_inv_curr_view_pose_quats = quaternion_inverse(
+                    pred_info[i]["pose_quats"]
+                )
+                pred_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    pred_inv_curr_view_pose_quats
+                )
+                pred_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    pred_inv_curr_view_pose_rot_mat,
+                    pred_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the inverse of the current view GT pose
+                gt_inv_curr_view_pose_quats = quaternion_inverse(
+                    gt_info[i]["pose_quats"]
+                )
+                gt_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    gt_inv_curr_view_pose_quats
+                )
+                gt_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    gt_inv_curr_view_pose_rot_mat,
+                    gt_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the other N-1 relative poses using the current pose as reference frame
+                pred_rel_pose_quats = []
+                pred_rel_pose_trans = []
+                gt_rel_pose_quats = []
+                gt_rel_pose_trans = []
+                for ov_idx in range(n_views):
+                    if ov_idx == i:
+                        continue
+                    # Get the relative predicted pose
+                    pred_ov_rel_pose_quats = quaternion_multiply(
+                        pred_inv_curr_view_pose_quats, pred_info[ov_idx]["pose_quats"]
+                    )
+                    pred_ov_rel_pose_trans = (
+                        ein.einsum(
+                            pred_inv_curr_view_pose_rot_mat,
+                            pred_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + pred_inv_curr_view_pose_trans
+                    )
+
+                    # Get the relative GT pose
+                    gt_ov_rel_pose_quats = quaternion_multiply(
+                        gt_inv_curr_view_pose_quats, gt_info[ov_idx]["pose_quats"]
+                    )
+                    gt_ov_rel_pose_trans = (
+                        ein.einsum(
+                            gt_inv_curr_view_pose_rot_mat,
+                            gt_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + gt_inv_curr_view_pose_trans
+                    )
+
+                    # Get the valid translations using valid_norm_factor_masks for current view and other view
+                    overall_valid_mask_for_trans = (
+                        valid_norm_factor_masks[i] & valid_norm_factor_masks[ov_idx]
+                    )
+
+                    # Append the relative poses
+                    pred_rel_pose_quats.append(pred_ov_rel_pose_quats)
+                    pred_rel_pose_trans.append(
+                        pred_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+                    gt_rel_pose_quats.append(gt_ov_rel_pose_quats)
+                    gt_rel_pose_trans.append(
+                        gt_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+
+                # Cat the N-1 relative poses along the batch dimension
+                pred_rel_pose_quats = torch.cat(pred_rel_pose_quats, dim=0)
+                pred_rel_pose_trans = torch.cat(pred_rel_pose_trans, dim=0)
+                gt_rel_pose_quats = torch.cat(gt_rel_pose_quats, dim=0)
+                gt_rel_pose_trans = torch.cat(gt_rel_pose_trans, dim=0)
+
+                # Compute pose translation loss
+                rel_pose_trans_loss = self.criterion(
+                    pred_rel_pose_trans, gt_rel_pose_trans, factor="pose_trans"
+                )
+                rel_pose_trans_loss = rel_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                rel_pose_quats_loss = torch.minimum(
+                    self.criterion(
+                        pred_rel_pose_quats, gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                    self.criterion(
+                        pred_rel_pose_quats, -gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                )
+                rel_pose_quats_loss = rel_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Concatenate the absolute and relative pose losses together
+                pose_trans_loss = torch.cat(
+                    [abs_pose_trans_loss, rel_pose_trans_loss], dim=0
+                )
+                pose_quats_loss = torch.cat(
+                    [abs_pose_quats_loss, rel_pose_quats_loss], dim=0
+                )
+                pose_trans_losses.append(pose_trans_loss)
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_absolute_pose_loss:
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
+                pose_trans_losses.append(pose_trans_loss)
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_pairwise_relative_pose_loss:
                 # Get the inverse of current view predicted pose
                 pred_inv_curr_view_pose_quats = quaternion_inverse(
                     pred_info[i]["pose_quats"]
@@ -2521,29 +2685,10 @@ class FactoredGeometryRegr3D(Criterion, MultiLoss):
                 pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
                 pose_quats_losses.append(pose_quats_loss)
             else:
-                # Get the pose info for the current view
-                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                pred_pose_quats = pred_info[i]["pose_quats"]
-                gt_pose_quats = gt_info[i]["pose_quats"]
-
-                # Compute pose translation loss
-                pose_trans_loss = self.criterion(
-                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                # Error
+                raise ValueError(
+                    "compute_absolute_pose_loss and compute_pairwise_relative_pose_loss cannot both be False"
                 )
-                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
-                pose_trans_losses.append(pose_trans_loss)
-
-                # Compute pose rotation loss
-                # Handle quaternion two-to-one mapping
-                pose_quats_loss = torch.minimum(
-                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
-                    self.criterion(
-                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
-                    ),
-                )
-                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
-                pose_quats_losses.append(pose_quats_loss)
 
             # Compute ray direction loss
             ray_directions_loss = self.criterion(
@@ -2679,6 +2824,7 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
         ray_directions_loss_weight=1,
         pose_quats_loss_weight=1,
         pose_trans_loss_weight=1,
+        compute_absolute_pose_loss=True,
         compute_pairwise_relative_pose_loss=False,
         convert_predictions_to_view0_frame=False,
         compute_world_frame_points_loss=True,
@@ -2714,6 +2860,7 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
             ray_directions_loss_weight (float): Weight to use for the ray directions loss. Default: 1.
             pose_quats_loss_weight (float): Weight to use for the pose quats loss. Default: 1.
             pose_trans_loss_weight (float): Weight to use for the pose trans loss. Default: 1.
+            compute_absolute_pose_loss (bool): If True, compute the absolute pose loss. Default: True.
             compute_pairwise_relative_pose_loss (bool): If True, the pose loss is computed on the
                 exhaustive pairwise relative poses. Default: False.
             convert_predictions_to_view0_frame (bool): If True, convert predictions to view0 frame.
@@ -2739,6 +2886,7 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
             ray_directions_loss_weight=ray_directions_loss_weight,
             pose_quats_loss_weight=pose_quats_loss_weight,
             pose_trans_loss_weight=pose_trans_loss_weight,
+            compute_absolute_pose_loss=compute_absolute_pose_loss,
             compute_pairwise_relative_pose_loss=compute_pairwise_relative_pose_loss,
             convert_predictions_to_view0_frame=convert_predictions_to_view0_frame,
             compute_world_frame_points_loss=compute_world_frame_points_loss,
@@ -2865,7 +3013,168 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
                     gt_pts3d = apply_log_to_norm(gt_pts3d)
                     pred_pts3d = apply_log_to_norm(pred_pts3d)
 
-            if self.compute_pairwise_relative_pose_loss:
+            # Compute pose loss
+            if (
+                self.compute_absolute_pose_loss
+                and self.compute_pairwise_relative_pose_loss
+            ):
+                # Compute the absolute pose loss
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                abs_pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                abs_pose_trans_loss = abs_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                abs_pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                abs_pose_quats_loss = abs_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Compute the pairwise relative pose loss
+                # Get the inverse of current view predicted pose
+                pred_inv_curr_view_pose_quats = quaternion_inverse(
+                    pred_info[i]["pose_quats"]
+                )
+                pred_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    pred_inv_curr_view_pose_quats
+                )
+                pred_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    pred_inv_curr_view_pose_rot_mat,
+                    pred_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the inverse of the current view GT pose
+                gt_inv_curr_view_pose_quats = quaternion_inverse(
+                    gt_info[i]["pose_quats"]
+                )
+                gt_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    gt_inv_curr_view_pose_quats
+                )
+                gt_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    gt_inv_curr_view_pose_rot_mat,
+                    gt_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the other N-1 relative poses using the current pose as reference frame
+                pred_rel_pose_quats = []
+                pred_rel_pose_trans = []
+                gt_rel_pose_quats = []
+                gt_rel_pose_trans = []
+                for ov_idx in range(n_views):
+                    if ov_idx == i:
+                        continue
+                    # Get the relative predicted pose
+                    pred_ov_rel_pose_quats = quaternion_multiply(
+                        pred_inv_curr_view_pose_quats, pred_info[ov_idx]["pose_quats"]
+                    )
+                    pred_ov_rel_pose_trans = (
+                        ein.einsum(
+                            pred_inv_curr_view_pose_rot_mat,
+                            pred_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + pred_inv_curr_view_pose_trans
+                    )
+
+                    # Get the relative GT pose
+                    gt_ov_rel_pose_quats = quaternion_multiply(
+                        gt_inv_curr_view_pose_quats, gt_info[ov_idx]["pose_quats"]
+                    )
+                    gt_ov_rel_pose_trans = (
+                        ein.einsum(
+                            gt_inv_curr_view_pose_rot_mat,
+                            gt_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + gt_inv_curr_view_pose_trans
+                    )
+
+                    # Get the valid translations using valid_norm_factor_masks for current view and other view
+                    overall_valid_mask_for_trans = (
+                        valid_norm_factor_masks[i] & valid_norm_factor_masks[ov_idx]
+                    )
+
+                    # Append the relative poses
+                    pred_rel_pose_quats.append(pred_ov_rel_pose_quats)
+                    pred_rel_pose_trans.append(
+                        pred_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+                    gt_rel_pose_quats.append(gt_ov_rel_pose_quats)
+                    gt_rel_pose_trans.append(
+                        gt_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+
+                # Cat the N-1 relative poses along the batch dimension
+                pred_rel_pose_quats = torch.cat(pred_rel_pose_quats, dim=0)
+                pred_rel_pose_trans = torch.cat(pred_rel_pose_trans, dim=0)
+                gt_rel_pose_quats = torch.cat(gt_rel_pose_quats, dim=0)
+                gt_rel_pose_trans = torch.cat(gt_rel_pose_trans, dim=0)
+
+                # Compute pose translation loss
+                rel_pose_trans_loss = self.criterion(
+                    pred_rel_pose_trans, gt_rel_pose_trans, factor="pose_trans"
+                )
+                rel_pose_trans_loss = rel_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                rel_pose_quats_loss = torch.minimum(
+                    self.criterion(
+                        pred_rel_pose_quats, gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                    self.criterion(
+                        pred_rel_pose_quats, -gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                )
+                rel_pose_quats_loss = rel_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Concatenate the absolute and relative pose losses together
+                pose_trans_loss = torch.cat(
+                    [abs_pose_trans_loss, rel_pose_trans_loss], dim=0
+                )
+                pose_quats_loss = torch.cat(
+                    [abs_pose_quats_loss, rel_pose_quats_loss], dim=0
+                )
+                pose_trans_losses.append(pose_trans_loss)
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_absolute_pose_loss:
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
+                pose_trans_losses.append(pose_trans_loss)
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_pairwise_relative_pose_loss:
                 # Get the inverse of current view predicted pose
                 pred_inv_curr_view_pose_quats = quaternion_inverse(
                     pred_info[i]["pose_quats"]
@@ -2967,29 +3276,10 @@ class FactoredGeometryRegr3DPlusNormalGMLoss(FactoredGeometryRegr3D):
                 pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
                 pose_quats_losses.append(pose_quats_loss)
             else:
-                # Get the pose info for the current view
-                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                pred_pose_quats = pred_info[i]["pose_quats"]
-                gt_pose_quats = gt_info[i]["pose_quats"]
-
-                # Compute pose translation loss
-                pose_trans_loss = self.criterion(
-                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                # Error
+                raise ValueError(
+                    "compute_absolute_pose_loss and compute_pairwise_relative_pose_loss cannot both be False"
                 )
-                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
-                pose_trans_losses.append(pose_trans_loss)
-
-                # Compute pose rotation loss
-                # Handle quaternion two-to-one mapping
-                pose_quats_loss = torch.minimum(
-                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
-                    self.criterion(
-                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
-                    ),
-                )
-                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
-                pose_quats_losses.append(pose_quats_loss)
 
             # Compute ray direction loss
             ray_directions_loss = self.criterion(
@@ -3135,6 +3425,7 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
         pose_quats_loss_weight=1,
         pose_trans_loss_weight=1,
         scale_loss_weight=1,
+        compute_absolute_pose_loss=True,
         compute_pairwise_relative_pose_loss=False,
         convert_predictions_to_view0_frame=False,
         compute_world_frame_points_loss=True,
@@ -3168,6 +3459,7 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
             pose_quats_loss_weight (float): Weight to use for the pose quats loss. Default: 1.
             pose_trans_loss_weight (float): Weight to use for the pose trans loss. Default: 1.
             scale_loss_weight (float): Weight to use for the scale loss. Default: 1.
+            compute_absolute_pose_loss (bool): If True, compute the absolute pose loss. Default: True.
             compute_pairwise_relative_pose_loss (bool): If True, the pose loss is computed on the
                 exhaustive pairwise relative poses. Default: False.
             convert_predictions_to_view0_frame (bool): If True, convert predictions to view0 frame.
@@ -3192,6 +3484,7 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
         self.pose_quats_loss_weight = pose_quats_loss_weight
         self.pose_trans_loss_weight = pose_trans_loss_weight
         self.scale_loss_weight = scale_loss_weight
+        self.compute_absolute_pose_loss = compute_absolute_pose_loss
         self.compute_pairwise_relative_pose_loss = compute_pairwise_relative_pose_loss
         self.convert_predictions_to_view0_frame = convert_predictions_to_view0_frame
         self.compute_world_frame_points_loss = compute_world_frame_points_loss
@@ -3550,7 +3843,168 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
                     gt_pts3d = apply_log_to_norm(gt_pts3d)
                     pred_pts3d = apply_log_to_norm(pred_pts3d)
 
-            if self.compute_pairwise_relative_pose_loss:
+            # Compute pose loss
+            if (
+                self.compute_absolute_pose_loss
+                and self.compute_pairwise_relative_pose_loss
+            ):
+                # Compute the absolute pose loss
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                abs_pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                abs_pose_trans_loss = abs_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                abs_pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                abs_pose_quats_loss = abs_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Compute the pairwise relative pose loss
+                # Get the inverse of current view predicted pose
+                pred_inv_curr_view_pose_quats = quaternion_inverse(
+                    pred_info[i]["pose_quats"]
+                )
+                pred_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    pred_inv_curr_view_pose_quats
+                )
+                pred_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    pred_inv_curr_view_pose_rot_mat,
+                    pred_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the inverse of the current view GT pose
+                gt_inv_curr_view_pose_quats = quaternion_inverse(
+                    gt_info[i]["pose_quats"]
+                )
+                gt_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    gt_inv_curr_view_pose_quats
+                )
+                gt_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    gt_inv_curr_view_pose_rot_mat,
+                    gt_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the other N-1 relative poses using the current pose as reference frame
+                pred_rel_pose_quats = []
+                pred_rel_pose_trans = []
+                gt_rel_pose_quats = []
+                gt_rel_pose_trans = []
+                for ov_idx in range(n_views):
+                    if ov_idx == i:
+                        continue
+                    # Get the relative predicted pose
+                    pred_ov_rel_pose_quats = quaternion_multiply(
+                        pred_inv_curr_view_pose_quats, pred_info[ov_idx]["pose_quats"]
+                    )
+                    pred_ov_rel_pose_trans = (
+                        ein.einsum(
+                            pred_inv_curr_view_pose_rot_mat,
+                            pred_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + pred_inv_curr_view_pose_trans
+                    )
+
+                    # Get the relative GT pose
+                    gt_ov_rel_pose_quats = quaternion_multiply(
+                        gt_inv_curr_view_pose_quats, gt_info[ov_idx]["pose_quats"]
+                    )
+                    gt_ov_rel_pose_trans = (
+                        ein.einsum(
+                            gt_inv_curr_view_pose_rot_mat,
+                            gt_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + gt_inv_curr_view_pose_trans
+                    )
+
+                    # Get the valid translations using valid_norm_factor_masks for current view and other view
+                    overall_valid_mask_for_trans = (
+                        valid_norm_factor_masks[i] & valid_norm_factor_masks[ov_idx]
+                    )
+
+                    # Append the relative poses
+                    pred_rel_pose_quats.append(pred_ov_rel_pose_quats)
+                    pred_rel_pose_trans.append(
+                        pred_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+                    gt_rel_pose_quats.append(gt_ov_rel_pose_quats)
+                    gt_rel_pose_trans.append(
+                        gt_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+
+                # Cat the N-1 relative poses along the batch dimension
+                pred_rel_pose_quats = torch.cat(pred_rel_pose_quats, dim=0)
+                pred_rel_pose_trans = torch.cat(pred_rel_pose_trans, dim=0)
+                gt_rel_pose_quats = torch.cat(gt_rel_pose_quats, dim=0)
+                gt_rel_pose_trans = torch.cat(gt_rel_pose_trans, dim=0)
+
+                # Compute pose translation loss
+                rel_pose_trans_loss = self.criterion(
+                    pred_rel_pose_trans, gt_rel_pose_trans, factor="pose_trans"
+                )
+                rel_pose_trans_loss = rel_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                rel_pose_quats_loss = torch.minimum(
+                    self.criterion(
+                        pred_rel_pose_quats, gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                    self.criterion(
+                        pred_rel_pose_quats, -gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                )
+                rel_pose_quats_loss = rel_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Concatenate the absolute and relative pose losses together
+                pose_trans_loss = torch.cat(
+                    [abs_pose_trans_loss, rel_pose_trans_loss], dim=0
+                )
+                pose_quats_loss = torch.cat(
+                    [abs_pose_quats_loss, rel_pose_quats_loss], dim=0
+                )
+                pose_trans_losses.append(pose_trans_loss)
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_absolute_pose_loss:
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
+                pose_trans_losses.append(pose_trans_loss)
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_pairwise_relative_pose_loss:
                 # Get the inverse of current view predicted pose
                 pred_inv_curr_view_pose_quats = quaternion_inverse(
                     pred_info[i]["pose_quats"]
@@ -3652,29 +4106,10 @@ class FactoredGeometryScaleRegr3D(Criterion, MultiLoss):
                 pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
                 pose_quats_losses.append(pose_quats_loss)
             else:
-                # Get the pose info for the current view
-                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                pred_pose_quats = pred_info[i]["pose_quats"]
-                gt_pose_quats = gt_info[i]["pose_quats"]
-
-                # Compute pose translation loss
-                pose_trans_loss = self.criterion(
-                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                # Error
+                raise ValueError(
+                    "compute_absolute_pose_loss and compute_pairwise_relative_pose_loss cannot both be False"
                 )
-                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
-                pose_trans_losses.append(pose_trans_loss)
-
-                # Compute pose rotation loss
-                # Handle quaternion two-to-one mapping
-                pose_quats_loss = torch.minimum(
-                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
-                    self.criterion(
-                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
-                    ),
-                )
-                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
-                pose_quats_losses.append(pose_quats_loss)
 
             # Compute ray direction loss
             ray_directions_loss = self.criterion(
@@ -3829,6 +4264,7 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
         pose_quats_loss_weight=1,
         pose_trans_loss_weight=1,
         scale_loss_weight=1,
+        compute_absolute_pose_loss=True,
         compute_pairwise_relative_pose_loss=False,
         convert_predictions_to_view0_frame=False,
         compute_world_frame_points_loss=True,
@@ -3865,6 +4301,7 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
                 exhaustive pairwise relative poses. Default: False.
             convert_predictions_to_view0_frame (bool): If True, convert predictions to view0 frame.
                 Use this if the predictions are not already in the view0 frame. Default: False.
+            compute_absolute_pose_loss (bool): If True, compute the absolute pose loss. Default: True.
             compute_world_frame_points_loss (bool): If True, compute the world frame pointmap loss. Default: True.
             world_frame_points_loss_weight (float): Weight to use for the world frame pointmap loss. Default: 1.
             apply_normal_and_gm_loss_to_synthetic_data_only (bool): If True, apply the normal and gm loss only to synthetic data.
@@ -3886,6 +4323,7 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
             pose_quats_loss_weight=pose_quats_loss_weight,
             pose_trans_loss_weight=pose_trans_loss_weight,
             scale_loss_weight=scale_loss_weight,
+            compute_absolute_pose_loss=compute_absolute_pose_loss,
             compute_pairwise_relative_pose_loss=compute_pairwise_relative_pose_loss,
             convert_predictions_to_view0_frame=convert_predictions_to_view0_frame,
             compute_world_frame_points_loss=compute_world_frame_points_loss,
@@ -4017,7 +4455,168 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
                     gt_pts3d = apply_log_to_norm(gt_pts3d)
                     pred_pts3d = apply_log_to_norm(pred_pts3d)
 
-            if self.compute_pairwise_relative_pose_loss:
+            # Compute pose loss
+            if (
+                self.compute_absolute_pose_loss
+                and self.compute_pairwise_relative_pose_loss
+            ):
+                # Compute the absolute pose loss
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                abs_pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                abs_pose_trans_loss = abs_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                abs_pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                abs_pose_quats_loss = abs_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Compute the pairwise relative pose loss
+                # Get the inverse of current view predicted pose
+                pred_inv_curr_view_pose_quats = quaternion_inverse(
+                    pred_info[i]["pose_quats"]
+                )
+                pred_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    pred_inv_curr_view_pose_quats
+                )
+                pred_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    pred_inv_curr_view_pose_rot_mat,
+                    pred_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the inverse of the current view GT pose
+                gt_inv_curr_view_pose_quats = quaternion_inverse(
+                    gt_info[i]["pose_quats"]
+                )
+                gt_inv_curr_view_pose_rot_mat = quaternion_to_rotation_matrix(
+                    gt_inv_curr_view_pose_quats
+                )
+                gt_inv_curr_view_pose_trans = -1 * ein.einsum(
+                    gt_inv_curr_view_pose_rot_mat,
+                    gt_info[i]["pose_trans"],
+                    "b i j, b j -> b i",
+                )
+
+                # Get the other N-1 relative poses using the current pose as reference frame
+                pred_rel_pose_quats = []
+                pred_rel_pose_trans = []
+                gt_rel_pose_quats = []
+                gt_rel_pose_trans = []
+                for ov_idx in range(n_views):
+                    if ov_idx == i:
+                        continue
+                    # Get the relative predicted pose
+                    pred_ov_rel_pose_quats = quaternion_multiply(
+                        pred_inv_curr_view_pose_quats, pred_info[ov_idx]["pose_quats"]
+                    )
+                    pred_ov_rel_pose_trans = (
+                        ein.einsum(
+                            pred_inv_curr_view_pose_rot_mat,
+                            pred_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + pred_inv_curr_view_pose_trans
+                    )
+
+                    # Get the relative GT pose
+                    gt_ov_rel_pose_quats = quaternion_multiply(
+                        gt_inv_curr_view_pose_quats, gt_info[ov_idx]["pose_quats"]
+                    )
+                    gt_ov_rel_pose_trans = (
+                        ein.einsum(
+                            gt_inv_curr_view_pose_rot_mat,
+                            gt_info[ov_idx]["pose_trans"],
+                            "b i j, b j -> b i",
+                        )
+                        + gt_inv_curr_view_pose_trans
+                    )
+
+                    # Get the valid translations using valid_norm_factor_masks for current view and other view
+                    overall_valid_mask_for_trans = (
+                        valid_norm_factor_masks[i] & valid_norm_factor_masks[ov_idx]
+                    )
+
+                    # Append the relative poses
+                    pred_rel_pose_quats.append(pred_ov_rel_pose_quats)
+                    pred_rel_pose_trans.append(
+                        pred_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+                    gt_rel_pose_quats.append(gt_ov_rel_pose_quats)
+                    gt_rel_pose_trans.append(
+                        gt_ov_rel_pose_trans[overall_valid_mask_for_trans]
+                    )
+
+                # Cat the N-1 relative poses along the batch dimension
+                pred_rel_pose_quats = torch.cat(pred_rel_pose_quats, dim=0)
+                pred_rel_pose_trans = torch.cat(pred_rel_pose_trans, dim=0)
+                gt_rel_pose_quats = torch.cat(gt_rel_pose_quats, dim=0)
+                gt_rel_pose_trans = torch.cat(gt_rel_pose_trans, dim=0)
+
+                # Compute pose translation loss
+                rel_pose_trans_loss = self.criterion(
+                    pred_rel_pose_trans, gt_rel_pose_trans, factor="pose_trans"
+                )
+                rel_pose_trans_loss = rel_pose_trans_loss * self.pose_trans_loss_weight
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                rel_pose_quats_loss = torch.minimum(
+                    self.criterion(
+                        pred_rel_pose_quats, gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                    self.criterion(
+                        pred_rel_pose_quats, -gt_rel_pose_quats, factor="pose_quats"
+                    ),
+                )
+                rel_pose_quats_loss = rel_pose_quats_loss * self.pose_quats_loss_weight
+
+                # Concatenate the absolute and relative pose losses together
+                pose_trans_loss = torch.cat(
+                    [abs_pose_trans_loss, rel_pose_trans_loss], dim=0
+                )
+                pose_quats_loss = torch.cat(
+                    [abs_pose_quats_loss, rel_pose_quats_loss], dim=0
+                )
+                pose_trans_losses.append(pose_trans_loss)
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_absolute_pose_loss:
+                # Get the pose info for the current view
+                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
+                pred_pose_quats = pred_info[i]["pose_quats"]
+                gt_pose_quats = gt_info[i]["pose_quats"]
+
+                # Compute pose translation loss
+                pose_trans_loss = self.criterion(
+                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                )
+                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
+                pose_trans_losses.append(pose_trans_loss)
+
+                # Compute pose rotation loss
+                # Handle quaternion two-to-one mapping
+                pose_quats_loss = torch.minimum(
+                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
+                    self.criterion(
+                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
+                    ),
+                )
+                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
+                pose_quats_losses.append(pose_quats_loss)
+            elif self.compute_pairwise_relative_pose_loss:
                 # Get the inverse of current view predicted pose
                 pred_inv_curr_view_pose_quats = quaternion_inverse(
                     pred_info[i]["pose_quats"]
@@ -4119,29 +4718,10 @@ class FactoredGeometryScaleRegr3DPlusNormalGMLoss(FactoredGeometryScaleRegr3D):
                 pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
                 pose_quats_losses.append(pose_quats_loss)
             else:
-                # Get the pose info for the current view
-                pred_pose_trans = pred_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                gt_pose_trans = gt_info[i]["pose_trans"][valid_norm_factor_masks[i]]
-                pred_pose_quats = pred_info[i]["pose_quats"]
-                gt_pose_quats = gt_info[i]["pose_quats"]
-
-                # Compute pose translation loss
-                pose_trans_loss = self.criterion(
-                    pred_pose_trans, gt_pose_trans, factor="pose_trans"
+                # Error
+                raise ValueError(
+                    "compute_absolute_pose_loss and compute_pairwise_relative_pose_loss cannot both be False"
                 )
-                pose_trans_loss = pose_trans_loss * self.pose_trans_loss_weight
-                pose_trans_losses.append(pose_trans_loss)
-
-                # Compute pose rotation loss
-                # Handle quaternion two-to-one mapping
-                pose_quats_loss = torch.minimum(
-                    self.criterion(pred_pose_quats, gt_pose_quats, factor="pose_quats"),
-                    self.criterion(
-                        pred_pose_quats, -gt_pose_quats, factor="pose_quats"
-                    ),
-                )
-                pose_quats_loss = pose_quats_loss * self.pose_quats_loss_weight
-                pose_quats_losses.append(pose_quats_loss)
 
             # Compute ray direction loss
             ray_directions_loss = self.criterion(

@@ -15,5 +15,5 @@ python3 \
     batch_size=20 \
     model=mapanything \
     model/task=images_only \
-    model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_48ipg_64g/checkpoint-last.pth' \
+    model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_36ipg_64g/checkpoint-last.pth' \
     hydra.run.dir='${root_experiments_dir}/mapanything/calibration_benchmarking/single_view/mapanything'

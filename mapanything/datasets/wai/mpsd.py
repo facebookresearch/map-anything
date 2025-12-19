@@ -172,11 +172,13 @@ def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-rd", "--root_dir", default="/fsx/xrtech/data/mpsd", type=str)
+    parser.add_argument(
+        "-rd", "--root_dir", default="/ai4rl/fsx/xrtech/data/mpsd", type=str
+    )
     parser.add_argument(
         "-dmd",
         "--dataset_metadata_dir",
-        default="/fsx/nkeetha/mapanything_dataset_metadata",
+        default="/ai4rl/fsx/nkeetha/mapanything_dataset_metadata",
         type=str,
     )
     parser.add_argument(

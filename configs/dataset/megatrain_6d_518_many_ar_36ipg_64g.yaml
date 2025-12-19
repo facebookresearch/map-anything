@@ -1,0 +1,38 @@
+defaults:
+  - default
+
+# Number of views parameter for the multi-view datasets
+num_views: 4
+
+train:
+  # If True, the number of views can vary from batch to batch. The maximum number of views is num_views and minimum is 2. (On by default for N-view training)
+  variable_num_views: true
+
+# Train Resolution
+resolution_train: ${dataset.resolution_options.518_many_ar}
+
+# Validation Resolution
+resolution_val_blendedmvs: ${dataset.resolution_options.518_1_33_ar}
+resolution_val_mpsd: ${dataset.resolution_options.518_1_77_ar}
+resolution_val_scannetpp: ${dataset.resolution_options.518_1_52_ar}
+resolution_val_spring: ${dataset.resolution_options.518_1_77_ar}
+resolution_val_tav2_wb: ${dataset.resolution_options.518_1_00_ar}
+resolution_val_unrealstereo4k: ${dataset.resolution_options.518_1_77_ar}
+
+# Training Set
+train_dataset:
+  "+ 840_000 @ ${dataset.blendedmvs_wai.train.dataset_str}
+  + 840_000 @ ${dataset.mpsd_wai.train.dataset_str}
+  + 840_000 @ ${dataset.scannetpp_wai.train.dataset_str}
+  + 33_000 @ ${dataset.spring_wai.train.dataset_str}
+  + 840_000 @ ${dataset.tav2_wb_wai.train.dataset_str}
+  + 87_000 @ ${dataset.unrealstereo4k_wai.train.dataset_str}"
+
+# Validation Set
+test_dataset:
+  "+ 4_000 @ ${dataset.blendedmvs_wai.val.dataset_str}
+  + 4_000 @ ${dataset.mpsd_wai.val.dataset_str}
+  + 4_000 @ ${dataset.scannetpp_wai.val.dataset_str}
+  + 500 @ ${dataset.spring_wai.val.dataset_str}
+  + 4_000 @ ${dataset.tav2_wb_wai.val.dataset_str}
+  + 500 @ ${dataset.unrealstereo4k_wai.val.dataset_str}"
