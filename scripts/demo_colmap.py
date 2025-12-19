@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 """
-Demo script to get MapAnything outputs in COLMAP format. Optionally can also run BA on outputs.
+Demo script to get MapAnything outputs in COLMAP format.
 
 Reference: VGGT (https://github.com/facebookresearch/vggt/blob/main/demo_colmap.py)
 """
@@ -13,6 +13,9 @@ import argparse
 import copy
 import glob
 import os
+from PIL.ImageOps import exif_transpose
+import PIL
+import tqdm
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
@@ -29,9 +32,9 @@ from mapanything.third_party.np_to_pycolmap import (
     batch_np_matrix_to_pycolmap,
     batch_np_matrix_to_pycolmap_wo_track,
 )
-from mapanything.third_party.track_predict import predict_tracks
 from mapanything.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
-from mapanything.utils.image import rgb
+from mapanything.utils.image import rgb, load_images, find_closest_aspect_ratio
+from mapanything.utils.cropping import rescale_image_and_other_optional_info, crop_image_and_other_optional_info
 from mapanything.utils.misc import seed_everything
 from mapanything.utils.viz import predictions_to_glb
 from uniception.models.encoders.image_normalizations import IMAGE_NORMALIZATION_DICT
@@ -45,10 +48,16 @@ torch.backends.cudnn.deterministic = False
 def parse_args():
     parser = argparse.ArgumentParser(description="MapAnything COLMAP Demo")
     parser.add_argument(
-        "--scene_dir",
+        "--images_dir",
         type=str,
         required=True,
-        help="Directory containing the scene images",
+        help="Directory containing input images",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=None,
+        help="Directory to save COLMAP outputs (defaults to images_dir parent)",
     )
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed for reproducibility"
@@ -60,183 +69,17 @@ def parse_args():
         help="Use memory efficient inference for reconstruction (trades off speed)",
     )
     parser.add_argument(
-        "--conf_thres_value",
+        "--conf_percentile",
         type=float,
-        default=0.0,
-        help="Confidence threshold value for depth filtering (used only without BA)",
+        default=10,
+        help="The percentile to use for the confidence threshold for depth filtering. Defaults to 10.",
     )
     parser.add_argument(
-        "--save_glb",
+        "--apache",
         action="store_true",
-        default=False,
-        help="Save dense reconstruction (without BA) as GLB file",
-    )
-    parser.add_argument(
-        "--use_ba", action="store_true", default=False, help="Use BA for reconstruction"
-    )
-    ######### BA parameters #########
-    parser.add_argument(
-        "--max_reproj_error",
-        type=float,
-        default=8.0,
-        help="Maximum reprojection error for reconstruction",
-    )
-    parser.add_argument(
-        "--shared_camera",
-        action="store_true",
-        default=False,
-        help="Use shared camera for all images",
-    )
-    parser.add_argument(
-        "--camera_type",
-        type=str,
-        default="SIMPLE_PINHOLE",
-        help="Camera type for reconstruction",
-    )
-    parser.add_argument(
-        "--vis_thresh", type=float, default=0.2, help="Visibility threshold for tracks"
-    )
-    parser.add_argument(
-        "--query_frame_num", type=int, default=8, help="Number of frames to query"
-    )
-    parser.add_argument(
-        "--max_query_pts", type=int, default=4096, help="Maximum number of query points"
-    )
-    parser.add_argument(
-        "--fine_tracking",
-        action="store_true",
-        default=True,
-        help="Use fine tracking (slower but more accurate)",
+        help="Use Apache 2.0 licensed model (facebook/map-anything-apache)",
     )
     return parser.parse_args()
-
-
-def load_and_preprocess_images_square(
-    image_path_list, target_size=1024, data_norm_type=None
-):
-    """
-    Load and preprocess images by center padding to square and resizing to target size.
-    Also returns the position information of original pixels after transformation.
-
-    Args:
-        image_path_list (list): List of paths to image files
-        target_size (int, optional): Target size for both width and height. Defaults to 1024.
-        data_norm_type (str, optional): Image normalization type. See UniCeption IMAGE_NORMALIZATION_DICT keys. Defaults to None (no normalization).
-
-    Returns:
-        tuple: (
-            torch.Tensor: Batched tensor of preprocessed images with shape (N, 3, target_size, target_size),
-            torch.Tensor: Array of shape (N, 5) containing [x1, y1, x2, y2, width, height] for each image
-        )
-
-    Raises:
-        ValueError: If the input list is empty or if an invalid data_norm_type is provided
-    """
-    # Check for empty list
-    if len(image_path_list) == 0:
-        raise ValueError("At least 1 image is required")
-
-    images = []
-    original_coords = []  # Renamed from position_info to be more descriptive
-
-    # Set up normalization based on data_norm_type
-    if data_norm_type is None:
-        # No normalization, just convert to tensor
-        img_transform = tvf.ToTensor()
-    elif data_norm_type in IMAGE_NORMALIZATION_DICT.keys():
-        # Use the specified normalization
-        img_norm = IMAGE_NORMALIZATION_DICT[data_norm_type]
-        img_transform = tvf.Compose(
-            [tvf.ToTensor(), tvf.Normalize(mean=img_norm.mean, std=img_norm.std)]
-        )
-    else:
-        raise ValueError(
-            f"Unknown image normalization type: {data_norm_type}. Available options: {list(IMAGE_NORMALIZATION_DICT.keys())}"
-        )
-
-    for image_path in image_path_list:
-        # Open image
-        img = Image.open(image_path)
-
-        # If there's an alpha channel, blend onto white background
-        if img.mode == "RGBA":
-            background = Image.new("RGBA", img.size, (255, 255, 255, 255))
-            img = Image.alpha_composite(background, img)
-
-        # Convert to RGB
-        img = img.convert("RGB")
-
-        # Get original dimensions
-        width, height = img.size
-
-        # Make the image square by padding the shorter dimension
-        max_dim = max(width, height)
-
-        # Calculate padding
-        left = (max_dim - width) // 2
-        top = (max_dim - height) // 2
-
-        # Calculate scale factor for resizing
-        scale = target_size / max_dim
-
-        # Calculate final coordinates of original image in target space
-        x1 = left * scale
-        y1 = top * scale
-        x2 = (left + width) * scale
-        y2 = (top + height) * scale
-
-        # Store original image coordinates and scale
-        original_coords.append(np.array([x1, y1, x2, y2, width, height]))
-
-        # Create a new black square image and paste original
-        square_img = Image.new("RGB", (max_dim, max_dim), (0, 0, 0))
-        square_img.paste(img, (left, top))
-
-        # Resize to target size
-        square_img = square_img.resize(
-            (target_size, target_size), Image.Resampling.BICUBIC
-        )
-
-        # Convert to tensor and apply normalization
-        img_tensor = img_transform(square_img)
-        images.append(img_tensor)
-
-    # Stack all images
-    images = torch.stack(images)
-    original_coords = torch.from_numpy(np.array(original_coords)).float()
-
-    # Add additional dimension if single image to ensure correct shape
-    if len(image_path_list) == 1:
-        if images.dim() == 3:
-            images = images.unsqueeze(0)
-            original_coords = original_coords.unsqueeze(0)
-
-    return images, original_coords
-
-
-def randomly_limit_trues(mask: np.ndarray, max_trues: int) -> np.ndarray:
-    """
-    If mask has more than max_trues True values,
-    randomly keep only max_trues of them and set the rest to False.
-    """
-    # 1D positions of all True entries
-    true_indices = np.flatnonzero(mask)  # shape = (N_true,)
-
-    # if already within budget, return as-is
-    if true_indices.size <= max_trues:
-        return mask
-
-    # randomly pick which True positions to keep
-    sampled_indices = np.random.choice(
-        true_indices, size=max_trues, replace=False
-    )  # shape = (max_trues,)
-
-    # build new flat mask: True only at sampled positions
-    limited_flat_mask = np.zeros(mask.size, dtype=bool)
-    limited_flat_mask[sampled_indices] = True
-
-    # restore original shape
-    return limited_flat_mask.reshape(mask.shape)
 
 
 def create_pixel_coordinate_grid(num_frames, height, width):
@@ -269,109 +112,118 @@ def create_pixel_coordinate_grid(num_frames, height, width):
     return points_xyf
 
 
-def run_mapanything(
-    model,
-    images,
-    dtype,
-    resolution=518,
-    image_normalization_type="dinov2",
-    memory_efficient_inference=False,
-):
-    # Images: [V, 3, H, W]
-    # Check image shape
-    assert len(images.shape) == 4
-    assert images.shape[1] == 3
-
-    # Hard-coded to use 518 for MapAnything
-    images = F.interpolate(
-        images, size=(resolution, resolution), mode="bilinear", align_corners=False
-    )
-
-    # Run inference
-    views = []
-    for view_idx in range(images.shape[0]):
-        view = {
-            "img": images[view_idx][None],  # Add batch dimension
-            "data_norm_type": [image_normalization_type],
-        }
-        views.append(view)
-    predictions = model.infer(
-        views, memory_efficient_inference=memory_efficient_inference
-    )
-
-    # Process predictions
-    (
-        all_extrinsics,
-        all_intrinsics,
-        all_depth_maps,
-        all_depth_confs,
-        all_pts3d,
-        all_img_no_norm,
-        all_masks,
-    ) = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
-    for pred in predictions:
-        # Compute 3D points from depth, intrinsics, and camera pose
-        depthmap_torch = pred["depth_z"][0].squeeze(-1)  # (H, W)
-        intrinsics_torch = pred["intrinsics"][0]  # (3, 3)
-        camera_pose_torch = pred["camera_poses"][0]  # (4, 4)
-        pts3d, valid_mask = depthmap_to_world_frame(
-            depthmap_torch, intrinsics_torch, camera_pose_torch
-        )
-
-        # Extract mask from predictions and combine with valid depth mask
-        mask = pred["mask"][0].squeeze(-1).cpu().numpy().astype(bool)
-        mask = mask & valid_mask.cpu().numpy()  # Combine with valid depth mask
-
-        # Convert tensors to numpy arrays
-        extrinsic = (
-            closed_form_pose_inverse(pred["camera_poses"])[0].cpu().numpy()
-        )  # c2w -> w2c
-        intrinsic = intrinsics_torch.cpu().numpy()
-        depth_map = depthmap_torch.cpu().numpy()
-        depth_conf = pred["conf"][0].cpu().numpy()
-        pts3d = pts3d.cpu().numpy()
-        img_no_norm = pred["img_no_norm"][0].cpu().numpy()  # Denormalized image
-
-        # Collect results
-        all_extrinsics.append(extrinsic)
-        all_intrinsics.append(intrinsic)
-        all_depth_maps.append(depth_map)
-        all_depth_confs.append(depth_conf)
-        all_pts3d.append(pts3d)
-        all_img_no_norm.append(img_no_norm)
-        all_masks.append(mask)
-
-    # Stack results into arrays
-    all_extrinsics = np.stack(all_extrinsics)
-    all_intrinsics = np.stack(all_intrinsics)
-    all_depth_maps = np.stack(all_depth_maps)
-    all_depth_confs = np.stack(all_depth_confs)
-    all_pts3d = np.stack(all_pts3d)
-    all_img_no_norm = np.stack(all_img_no_norm)
-    all_masks = np.stack(all_masks)
-
-    return (
-        all_extrinsics,
-        all_intrinsics,
-        all_depth_maps,
-        all_depth_confs,
-        all_pts3d,
-        all_img_no_norm,
-        all_masks,
-    )
-
-
-def demo_fn(args):
+def demo_fn(model, device, dtype, args, images_dir, output_dir):
     # Print configuration
-    print("Arguments:", vars(args))
+    print(f"\nProcessing images from: {images_dir}")
+
+    sparse_reconstruction_dir = os.path.join(output_dir, "sparse")
+
+    if os.path.exists(sparse_reconstruction_dir):
+        print(f"Reconstruction already exists at {sparse_reconstruction_dir}, skipping...")
+        return True
+
+    # Get image paths and preprocess them
+    image_path_list = glob.glob(os.path.join(images_dir, "*"))
+    if len(image_path_list) == 0:
+        raise ValueError(f"No images found in {images_dir}")
+    base_image_path_list = [os.path.basename(path) for path in image_path_list]
+
+    images = load_images(image_path_list)
+
+    outputs = model.infer(
+        images, memory_efficient_inference=args.memory_efficient_inference, confidence_percentile=args.conf_percentile
+    )
+
+    intrinsic = np.stack([outputs[i]["intrinsics"][0].cpu().numpy() for i in range(len(outputs))])
+    extrinsic = np.stack([closed_form_pose_inverse(outputs[i]["camera_poses"])[0].cpu().numpy() for i in range(len(outputs))])
+    points_3d = np.stack([outputs[i]["pts3d"][0].cpu().numpy() for i in range(len(outputs))])
+    images = np.stack([images[i]["img"][0].cpu().numpy() for i in range(len(images))])
+
+    shared_camera = (
+        False  # in the feedforward manner, we do not support shared camera
+    )
+    camera_type = (
+        "PINHOLE"  # in the feedforward manner, we only support PINHOLE camera
+    )
+
+    num_frames, height, width, _ = points_3d.shape
+    
+    image_size = np.array([width, height])
+
+    # Denormalize images before computing RGB values
+    points_rgb_images = F.interpolate(
+        torch.from_numpy(images).to(torch.float32),
+        size=(height, width),
+        mode="bilinear",
+        align_corners=False,
+    )
+
+    # Convert normalized images back to RGB [0,1] range using the rgb function
+    points_rgb_list = []
+    for i in range(points_rgb_images.shape[0]):
+        # rgb function expects single image tensor and returns numpy array in [0,1] range
+        rgb_img = rgb(points_rgb_images[i], model.encoder.data_norm_type)
+        points_rgb_list.append(rgb_img)
+
+    # Stack and convert to uint8
+    points_rgb = np.stack(points_rgb_list)  # Shape: (N, H, W, 3)
+    points_rgb = (points_rgb * 255).astype(np.uint8)
+
+    # (S, H, W, 3), with x, y coordinates and frame indices
+    points_xyf = create_pixel_coordinate_grid(num_frames, height, width)
+
+    # Filter points based on zero depth
+    valid_mask = points_3d[..., 2] > 0
+
+    points_3d = points_3d[valid_mask]
+    points_xyf = points_xyf[valid_mask]
+    points_rgb = points_rgb[valid_mask]
+
+    print("Converting to COLMAP format")
+    reconstruction = batch_np_matrix_to_pycolmap_wo_track(
+        points_3d,
+        points_xyf,
+        points_rgb,
+        extrinsic,
+        intrinsic,
+        image_size,
+        shared_camera=shared_camera,
+        camera_type=camera_type,
+    )
+
+    reconstruction = rename_colmap_recons(
+        reconstruction,
+        base_image_path_list,
+    )
+
+    print(f"Saving reconstruction to {output_dir}/sparse")
+
+    os.makedirs(sparse_reconstruction_dir, exist_ok=True)
+    reconstruction.write(sparse_reconstruction_dir)
+
+    # Save point cloud for fast visualization
+    trimesh.PointCloud(points_3d, colors=points_rgb).export(
+        os.path.join(output_dir, "sparse/points.ply")
+    )
+    return True
+
+
+def rename_colmap_recons(
+    reconstruction,
+    image_paths,
+):    
+    """Rename COLMAP reconstruction images to original names."""
+    for pyimageid in reconstruction.images:
+        # Reshaped the padded & resized image to the original size
+        # Rename the images to the original names
+        pyimage = reconstruction.images[pyimageid]
+        pyimage.name = image_paths[pyimageid - 1]
+
+    return reconstruction
+
+
+if __name__ == "__main__":
+    args = parse_args()
 
     # Set seed for reproducibility
     seed_everything(args.seed)
@@ -386,257 +238,35 @@ def demo_fn(args):
 
     # Init model
     print("Loading MapAnything model from huggingface ...")
-    model = MapAnything.from_pretrained("facebook/map-anything").to(device)
+    if args.apache:
+        model_name = "facebook/map-anything-apache"
+        print("Loading Apache 2.0 licensed MapAnything model...")
+    else:        
+        model_name = "facebook/map-anything"
+        print("Loading CC-BY-NC 4.0 licensed MapAnything model...")
+    
+    model = MapAnything.from_pretrained(model_name).to(device)
     model.eval()
 
-    # Get image paths and preprocess them
-    image_dir = os.path.join(args.scene_dir, "images")
-    image_path_list = glob.glob(os.path.join(image_dir, "*"))
-    if len(image_path_list) == 0:
-        raise ValueError(f"No images found in {image_dir}")
-    base_image_path_list = [os.path.basename(path) for path in image_path_list]
-
-    # Load images and original coordinates
-    # Load Image in 1024, while running MapAnything with 518
-    mapanything_fixed_resolution = 518
-    img_load_resolution = 1024
-
-    images, original_coords = load_and_preprocess_images_square(
-        image_path_list, img_load_resolution, model.encoder.data_norm_type
-    )
-    images = images.to(device)
-    original_coords = original_coords.to(device)
-    print(f"Loaded {len(images)} images from {image_dir}")
-
-    # Run MapAnything to estimate camera and depth
-    # Run with 518 x 518 images
-    extrinsic, intrinsic, depth_map, depth_conf, points_3d, img_no_norm, masks = (
-        run_mapanything(
-            model,
-            images,
-            dtype,
-            mapanything_fixed_resolution,
-            model.encoder.data_norm_type,
-            memory_efficient_inference=args.memory_efficient_inference,
-        )
-    )
-
-    # Prepare lists for GLB export if needed
-    world_points_list = []
-    images_list = []
-    masks_list = []
-
-    if args.save_glb:
-        for i in range(img_no_norm.shape[0]):
-            # Use the already denormalized images from predictions
-            images_list.append(img_no_norm[i])
-
-            # Add world points and masks from predictions
-            world_points_list.append(points_3d[i])
-            masks_list.append(masks[i])  # Use masks from predictions
-
-    if args.use_ba:
-        image_size = np.array(images.shape[-2:])
-        scale = img_load_resolution / mapanything_fixed_resolution
-        shared_camera = args.shared_camera
-
-        with torch.amp.autocast("cuda", dtype=dtype):
-            # Predicting Tracks
-            # Uses VGGSfM tracker
-            # You can also change the pred_tracks to tracks from any other methods
-            # e.g., from COLMAP, from CoTracker, or by chaining 2D matches from Lightglue/LoFTR.
-            pred_tracks, pred_vis_scores, pred_confs, points_3d, points_rgb = (
-                predict_tracks(
-                    images,
-                    conf=depth_conf,
-                    points_3d=points_3d,
-                    max_query_pts=args.max_query_pts,
-                    query_frame_num=args.query_frame_num,
-                    keypoint_extractor="aliked+sp",
-                    fine_tracking=args.fine_tracking,
-                )
-            )
-
-            torch.cuda.empty_cache()
-
-        # Rescale the intrinsic matrix from 518 to 1024
-        intrinsic[:, :2, :] *= scale
-        track_mask = pred_vis_scores > args.vis_thresh
-
-        # Init pycolmap reconstruction
-        reconstruction, valid_track_mask = batch_np_matrix_to_pycolmap(
-            points_3d,
-            extrinsic,
-            intrinsic,
-            pred_tracks,
-            image_size,
-            masks=track_mask,
-            max_reproj_error=args.max_reproj_error,
-            shared_camera=shared_camera,
-            camera_type=args.camera_type,
-            points_rgb=points_rgb,
-        )
-
-        if reconstruction is None:
-            raise ValueError("No reconstruction can be built with BA")
-
-        # Bundle Adjustment
-        ba_options = pycolmap.BundleAdjustmentOptions()
-        pycolmap.bundle_adjustment(reconstruction, ba_options)
-
-        reconstruction_resolution = img_load_resolution
-    else:
-        conf_thres_value = args.conf_thres_value
-        max_points_for_colmap = 100000  # randomly sample 3D points
-        shared_camera = (
-            False  # in the feedforward manner, we do not support shared camera
-        )
-        camera_type = (
-            "PINHOLE"  # in the feedforward manner, we only support PINHOLE camera
-        )
-
-        image_size = np.array(
-            [mapanything_fixed_resolution, mapanything_fixed_resolution]
-        )
-        num_frames, height, width, _ = points_3d.shape
-
-        # Denormalize images before computing RGB values
-        points_rgb_images = F.interpolate(
-            images,
-            size=(mapanything_fixed_resolution, mapanything_fixed_resolution),
-            mode="bilinear",
-            align_corners=False,
-        )
-
-        # Convert normalized images back to RGB [0,1] range using the rgb function
-        points_rgb_list = []
-        for i in range(points_rgb_images.shape[0]):
-            # rgb function expects single image tensor and returns numpy array in [0,1] range
-            rgb_img = rgb(points_rgb_images[i], model.encoder.data_norm_type)
-            points_rgb_list.append(rgb_img)
-
-        # Stack and convert to uint8
-        points_rgb = np.stack(points_rgb_list)  # Shape: (N, H, W, 3)
-        points_rgb = (points_rgb * 255).astype(np.uint8)
-
-        # (S, H, W, 3), with x, y coordinates and frame indices
-        points_xyf = create_pixel_coordinate_grid(num_frames, height, width)
-
-        conf_mask = depth_conf >= conf_thres_value
-        # At most writing 100000 3d points to colmap reconstruction object
-        conf_mask = randomly_limit_trues(conf_mask, max_points_for_colmap)
-
-        points_3d = points_3d[conf_mask]
-        points_xyf = points_xyf[conf_mask]
-        points_rgb = points_rgb[conf_mask]
-
-        print("Converting to COLMAP format")
-        reconstruction = batch_np_matrix_to_pycolmap_wo_track(
-            points_3d,
-            points_xyf,
-            points_rgb,
-            extrinsic,
-            intrinsic,
-            image_size,
-            shared_camera=shared_camera,
-            camera_type=camera_type,
-        )
-
-        reconstruction_resolution = mapanything_fixed_resolution
-
-    reconstruction = rename_colmap_recons_and_rescale_camera(
-        reconstruction,
-        base_image_path_list,
-        original_coords.cpu().numpy(),
-        img_size=reconstruction_resolution,
-        shift_point2d_to_original_res=True,
-        shared_camera=shared_camera,
-    )
-
-    print(f"Saving reconstruction to {args.scene_dir}/sparse")
-    sparse_reconstruction_dir = os.path.join(args.scene_dir, "sparse")
-    os.makedirs(sparse_reconstruction_dir, exist_ok=True)
-    reconstruction.write(sparse_reconstruction_dir)
-
-    # Save point cloud for fast visualization
-    trimesh.PointCloud(points_3d, colors=points_rgb).export(
-        os.path.join(args.scene_dir, "sparse/points.ply")
-    )
-
-    # Export GLB if requested
-    if args.save_glb:
-        glb_output_path = os.path.join(args.scene_dir, "dense_mesh.glb")
-        print(f"Saving GLB file to: {glb_output_path}")
-
-        # Stack all views
-        world_points = np.stack(world_points_list, axis=0)
-        images = np.stack(images_list, axis=0)
-        final_masks = np.stack(masks_list, axis=0)
-
-        # Create predictions dict for GLB export
-        predictions = {
-            "world_points": world_points,
-            "images": images,
-            "final_masks": final_masks,
-        }
-
-        # Convert to GLB scene
-        scene_3d = predictions_to_glb(predictions, as_mesh=True)
-
-        # Save GLB file
-        scene_3d.export(glb_output_path)
-        print(f"Successfully saved GLB file: {glb_output_path}")
-
-    return True
-
-
-def rename_colmap_recons_and_rescale_camera(
-    reconstruction,
-    image_paths,
-    original_coords,
-    img_size,
-    shift_point2d_to_original_res=False,
-    shared_camera=False,
-):
-    rescale_camera = True
-
-    for pyimageid in reconstruction.images:
-        # Reshaped the padded & resized image to the original size
-        # Rename the images to the original names
-        pyimage = reconstruction.images[pyimageid]
-        pycamera = reconstruction.cameras[pyimage.camera_id]
-        pyimage.name = image_paths[pyimageid - 1]
-
-        if rescale_camera:
-            # Rescale the camera parameters
-            pred_params = copy.deepcopy(pycamera.params)
-
-            real_image_size = original_coords[pyimageid - 1, -2:]
-            resize_ratio = max(real_image_size) / img_size
-            pred_params = pred_params * resize_ratio
-            real_pp = real_image_size / 2
-            pred_params[-2:] = real_pp  # center of the image
-
-            pycamera.params = pred_params
-            pycamera.width = real_image_size[0]
-            pycamera.height = real_image_size[1]
-
-        if shift_point2d_to_original_res:
-            # Also shift the point2D to original resolution
-            top_left = original_coords[pyimageid - 1, :2]
-
-            for point2D in pyimage.points2D:
-                point2D.xy = (point2D.xy - top_left) * resize_ratio
-
-        if shared_camera:
-            # If shared_camera, all images share the same camera
-            # No need to rescale any more
-            rescale_camera = False
-
-    return reconstruction
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    with torch.no_grad():
-        demo_fn(args)
+    # Validate images directory
+    if not os.path.isdir(args.images_dir):
+        raise ValueError(f"Images directory not found: {args.images_dir}")
+    
+    # Set output directory
+    if args.output_dir is None:
+        args.output_dir = os.path.dirname(args.images_dir)
+    
+    os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Process images
+    try:
+        with torch.no_grad():
+            success = demo_fn(model, device, dtype, args, args.images_dir, args.output_dir)
+            if success:
+                print(f"\n✅ Successfully processed images from {args.images_dir}")
+            else:
+                print(f"\n❌ Processing failed")
+    except Exception as e:
+        print(f"\n❌ Error processing images: {e}")
+        import traceback
+        traceback.print_exc()
