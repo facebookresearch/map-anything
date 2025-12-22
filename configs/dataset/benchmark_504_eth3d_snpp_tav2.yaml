@@ -1,0 +1,20 @@
+defaults:
+  - default
+
+# Number of views parameter for the multi-view datasets
+num_views: 2
+
+# Test Resolution
+resolution_test_eth3d: ${dataset.resolution_options.504_1_52_ar}
+resolution_test_scannetpp: ${dataset.resolution_options.504_1_52_ar}
+resolution_test_tav2_wb: ${dataset.resolution_options.504_1_00_ar}
+
+# Test Set
+# Sample 10 multi-view sets from each scene
+# ETH3D: 13 scenes
+# ScanNet++V2: 30 scenes
+# TartanAirV2-WB: 5 scenes
+test_dataset:
+  "+ 130 @ ${dataset.eth3d_wai.test.dataset_str}
+  + 300 @ ${dataset.scannetpp_wai.test.dataset_str}
+  + 50 @ ${dataset.tav2_wb_wai.test.dataset_str}"

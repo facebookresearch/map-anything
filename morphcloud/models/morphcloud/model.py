@@ -82,6 +82,7 @@ from uniception.models.prediction_heads.linear import LinearFeature
 from uniception.models.prediction_heads.mlp_head import MLPHead
 from uniception.models.prediction_heads.pose_head import PoseHead
 from morphcloud.models.morphcloud.opacity_head import OpacityHead, OpacityHeadOutput
+from uniception.models.utils.transformer_blocks import Mlp, SwiGLUFFNFused
 
 # Enable TF32 precision if supported (for GPU >= Ampere and PyTorch >= 1.12)
 if hasattr(torch.backends.cuda, "matmul") and hasattr(
@@ -107,6 +108,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         load_specific_pretrained_submodules: bool = False,
         specific_pretrained_submodules: list = None,
         torch_hub_force_reload: bool = False,
+        use_register_tokens_from_encoder: bool = False,
+        info_sharing_mlp_layer_str: str = "mlp",
     ):
         """
         Multi-view model containing an image encoder fused with optional geometric modalities followed by a multi-view attention transformer and respective downstream heads.
@@ -124,6 +127,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             load_specific_pretrained_submodules (bool): Whether to load specific pretrained submodules. (default: False)
             specific_pretrained_submodules (list): List of specific pretrained submodules to load. Must be provided when load_specific_pretrained_submodules is True. (default: None)
             torch_hub_force_reload (bool): Whether to force reload the encoder from torch hub. (default: False)
+            use_register_tokens_from_encoder (bool): Whether to use register tokens from encoder. (default: False)
+            info_sharing_mlp_layer_str (str): Type of MLP layer to use in the multi-view transformer. Useful for DINO init of the multi-view transformer. Options: "mlp" or "swiglufused". (default: "mlp")
         """
         super().__init__()
 
@@ -137,6 +142,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         self.load_specific_pretrained_submodules = load_specific_pretrained_submodules
         self.specific_pretrained_submodules = specific_pretrained_submodules
         self.torch_hub_force_reload = torch_hub_force_reload
+        self.use_register_tokens_from_encoder = use_register_tokens_from_encoder
+        self.info_sharing_mlp_layer_str = info_sharing_mlp_layer_str
         self.class_init_args = {
             "name": self.name,
             "encoder_config": self.encoder_config,
@@ -147,6 +154,8 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             "load_specific_pretrained_submodules": self.load_specific_pretrained_submodules,
             "specific_pretrained_submodules": self.specific_pretrained_submodules,
             "torch_hub_force_reload": self.torch_hub_force_reload,
+            "use_register_tokens_from_encoder": self.use_register_tokens_from_encoder,
+            "info_sharing_mlp_layer_str": self.info_sharing_mlp_layer_str,
         }
 
         # Get relevant parameters from the configs
@@ -206,6 +215,16 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         # During inference extended to (B, C, T), where T is the number of tokens (i.e., 1)
         self.scale_token = nn.Parameter(torch.zeros(self.encoder.enc_embed_dim))
         torch.nn.init.trunc_normal_(self.scale_token, std=0.02)
+
+        # Set the MLP layer config for the info sharing transformer
+        if info_sharing_mlp_layer_str == "mlp":
+            info_sharing_config["module_args"]["mlp_layer"] = Mlp
+        elif info_sharing_mlp_layer_str == "swiglufused":
+            info_sharing_config["module_args"]["mlp_layer"] = SwiGLUFFNFused
+        else:
+            raise ValueError(
+                f"Invalid info_sharing_mlp_layer_str: {info_sharing_mlp_layer_str}. Valid options: ['mlp', 'swiglufused']"
+            )
 
         # Initialize the info sharing module (multi-view transformer)
         self._initialize_info_sharing(info_sharing_config)
@@ -641,7 +660,9 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             views (List[dict]): List of dictionaries containing the input views' images and instance information.
 
         Returns:
-            List[torch.Tensor]: A list containing the encoded features for all N views.
+            A tuple containing:
+                List[torch.Tensor]: A list containing the encoded features for all N views.
+                List[torch.Tensor]: A list containing the encoded per-view registers for all N views.
         """
         num_views = len(views)
         data_norm_type = views[0]["data_norm_type"][0]
@@ -667,7 +688,16 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
             num_views, dim=0
         )
 
-        return all_encoder_features_across_views
+        all_encoder_registers_across_views = None
+        if (
+            self.use_register_tokens_from_encoder
+            and encoder_output.registers is not None
+        ):
+            all_encoder_registers_across_views = encoder_output.registers.chunk(
+                num_views, dim=0
+            )
+
+        return all_encoder_features_across_views, all_encoder_registers_across_views
 
     def _compute_frame_index_features(
         self,
@@ -2068,7 +2098,9 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         num_views = len(views)
 
         # Run the image encoder on all the input views
-        all_encoder_features_across_views = self._encode_n_views(views)
+        all_encoder_features_across_views, all_encoder_registers_across_views = (
+            self._encode_n_views(views)
+        )
 
         # Encode the optional geometric inputs and fuse with the encoded features from the N input views
         # Use high precision to prevent NaN values after layer norm in dense representation encoder (due to high variance in last dim of features)
@@ -2090,6 +2122,7 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
         # Output is a list containing the encoded features for all N views after information sharing.
         info_sharing_input = MultiViewTransformerInput(
             features=all_encoder_features_across_views,
+            additional_input_tokens_per_view=all_encoder_registers_across_views,
             additional_input_tokens=input_scale_token,
         )
         if self.info_sharing_return_type == "no_intermediate_features":
@@ -2655,7 +2688,13 @@ class MorphCloud(nn.Module, PyTorchModelHubMixin):
                 elif name == 'frame_index':
                     view[name] = view[name]  # Keep as is (int)
                 else:
-                    view[name] = view[name].to(self.device, non_blocking=True)
+                    val = view[name]
+                    if name == "camera_poses" and isinstance(val, tuple):
+                        view[name] = tuple(
+                            x.to(self.device, non_blocking=True) for x in val
+                        )
+                    elif hasattr(val, "to"):
+                        view[name] = val.to(self.device, non_blocking=True)
 
         # Pre-process the input views
         processed_views = preprocess_input_views_for_inference(validated_views)

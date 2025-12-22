@@ -6,6 +6,7 @@ wandb/
 data_processing/wai_processing/third_party
 hydra/
 private/
+.ruff_cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

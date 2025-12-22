@@ -521,6 +521,11 @@ We release **two variants** of the pre-trained MapAnything models on Hugging Fac
 1. **[facebook/map-anything](https://huggingface.co/facebook/map-anything)** (CC-BY-NC 4.0 License)
 2. **[facebook/map-anything-apache](https://huggingface.co/facebook/map-anything-apache)** (Apache 2.0 License)
 
+### Deprecated Models used for V1 Release in September 2025
+
+1. **[facebook/map-anything-v1](https://huggingface.co/facebook/map-anything-v1)** (CC-BY-NC 4.0 License)
+2. **[facebook/map-anything-apache-v1](https://huggingface.co/facebook/map-anything-apache-v1)** (Apache 2.0 License)
+
 ### Model Selection Guide
 
 - **For Research & Academic Use**: Use `facebook/map-anything` for the best performance
