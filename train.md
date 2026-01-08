@@ -115,7 +115,7 @@ The scripts include optimized settings for AWS multi-node training with EFA netw
 
 ## Dataset Coverage
 
-The training scripts support all 13 training datasets (with appropriate splits) converted to WAI format:
+The training scripts support all 14 training datasets (with appropriate splits) converted to WAI format:
 
 1. ✅ [Aria Synthetic Environments](https://www.projectaria.com/datasets/ase/)
 2. ✅ [BlendedMVS](https://github.com/YoYo000/BlendedMVS)
@@ -123,13 +123,14 @@ The training scripts support all 13 training datasets (with appropriate splits) 
 4. ✅ [Dynamic Replica](https://dynamic-stereo.github.io/)
 5. ✅ [Mapillary Planet Scale Depth & Reconstructions](https://www.mapillary.com/dataset/depth) (MPSD)
 6. ✅ [MegaDepth (including Tanks & Temples)](https://www.cs.cornell.edu/projects/megadepth/)
-7. ✅ [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
-8. ✅ [Parallel Domain 4D](https://gcd.cs.columbia.edu/#datasets)
-9. ✅ [SAIL-VOS 3D](https://sailvos.web.illinois.edu/_site/_site/index.html)
-10. ✅ [ScanNet++ v2](https://kaldir.vc.in.tum.de/scannetpp/)
-11. ✅ [Spring](https://spring-benchmark.org/)
-12. ✅ [TartanAirV2 Wide Baseline](https://uniflowmatch.github.io/)
-13. ✅ [UnrealStereo4K](https://github.com/fabiotosi92/SMD-Nets)
+7. ✅ [AerialMegaDepth](https://aerial-megadepth.github.io/)
+8. ✅ [MVS-Synth](https://phuang17.github.io/DeepMVS/mvs-synth.html)
+9. ✅ [Parallel Domain 4D](https://gcd.cs.columbia.edu/#datasets)
+10. ✅ [SAIL-VOS 3D](https://sailvos.web.illinois.edu/_site/_site/index.html)
+11. ✅ [ScanNet++ v2](https://kaldir.vc.in.tum.de/scannetpp/)
+12. ✅ [Spring](https://spring-benchmark.org/)
+13. ✅ [TartanAirV2 Wide Baseline](https://uniflowmatch.github.io/)
+14. ✅ [UnrealStereo4K](https://github.com/fabiotosi92/SMD-Nets)
 
 ## Reproducing Results
 

@@ -23,6 +23,7 @@ from mapanything.datasets.utils.data_splits import (
     DL3DV10KSplits,
     ETH3DSplits,
     MegaDepthSplits,
+    AerialMegaDepthSplits,
     MPSDSplits,
     ScanNetPPSplits,
     SpringSplits,
@@ -363,6 +364,24 @@ class MegaDepthAggregator(DatasetAggregator):
         super().aggregate(val_split_scenes=self.dataset_split_info.val_split_scenes)
 
 
+class AerialMegaDepthAggregator(DatasetAggregator):
+    """Aggregator for AerialMegaDepth dataset."""
+
+    def __init__(self, root_dir, output_dir, covisibility_version_key="v0"):
+        super().__init__(
+            dataset_name="aerialmegadepth",
+            root_dir=root_dir,
+            output_dir=output_dir,
+            covisibility_version_key=covisibility_version_key,
+            depth_folder="depth",
+        )
+        self.dataset_split_info = AerialMegaDepthSplits()
+
+    def aggregate(self):
+        """Aggregate the AerialMegaDepth dataset."""
+        super().aggregate(val_split_scenes=self.dataset_split_info.val_split_scenes)
+
+
 class MPSDAggregator(DatasetAggregator):
     """Aggregator for MPSD dataset."""
 
@@ -551,6 +570,7 @@ def main():
             "dynamicreplica",
             "eth3d",
             "megadepth",
+            "aerialmegadepth",
             "mpsd",
             "mvs_synth",
             "paralleldomain4d",
@@ -567,6 +587,7 @@ def main():
             "dynamicreplica",
             "eth3d",
             "megadepth",
+            "aerialmegadepth",
             "mpsd",
             "mvs_synth",
             "paralleldomain4d",
@@ -634,6 +655,12 @@ def main():
         elif dataset == "megadepth":
             # MegaDepth
             aggregator = MegaDepthAggregator(
+                root_dir=root_dir, output_dir=args.output_dir
+            )
+            aggregator.aggregate()
+        elif dataset == "aerialmegadepth":
+            # AerialMegaDepth
+            aggregator = AerialMegaDepthAggregator(
                 root_dir=root_dir, output_dir=args.output_dir
             )
             aggregator.aggregate()

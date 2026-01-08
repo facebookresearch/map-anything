@@ -1,0 +1,24 @@
+stage: # set stage via CLI
+root: # path of wai-formatted dataset
+
+gpus: 0
+cpus: 10
+mem: 20
+scenes_per_job: 20
+conda_env: # pass the name of our conda environment
+nodelist:
+
+stages:
+  conversion:
+    script: conversion/aerialmegadepth.py
+    config: conversion/aerialmegadepth.yaml
+    scenes_per_job: 20 # fast
+  covisibility:
+    script: covisibility.py
+    config: covisibility/covisibility_gt_depth_224x224.yaml
+    gpus: 1
+  moge:
+    script: run_moge.py
+    config: moge/default.yaml
+    additional_cli_params: ['batch_size=1']
+    gpus: 1
