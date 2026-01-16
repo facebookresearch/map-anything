@@ -198,6 +198,9 @@ MODEL_CONFIGS = {
         "class_name": "VGGTWrapper",
     },
     # Add other model classes here
+    "pixio": {
+        "class": MapAnything,
+    },
 }
 
 
