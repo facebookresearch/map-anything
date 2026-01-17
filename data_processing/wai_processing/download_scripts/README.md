@@ -53,6 +53,7 @@ Download all the zips from [Spring Benchmark](https://darus.uni-stuttgart.de/dat
 
 ## TartanAirV2 - Wide Baseline (UFM Version)
 Use the provided python script `download_tav2_wb.py`.
+**Source: ** [HuggingFace TA-WB-MapAnything](https://huggingface.co/datasets/infinity1096/TA-WB-MapAnything)
 
 ## UnrealStereo4K
 Use the provided python script `download_unrealstereo4k.py`.
