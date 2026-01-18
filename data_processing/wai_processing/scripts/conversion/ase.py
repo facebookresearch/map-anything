@@ -3,6 +3,10 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
+# Note: We use an internal version of the ASE dataset (ASE-V2) and it's format/data might not
+# necessarily align with the official public [ASE-V1](https://www.projectaria.com/datasets/ase/#download-dataset).
+# Hence, unfortunately, it might not be possible to reproduce the WAI version of ASE.
+
 import logging
 import os
 import re

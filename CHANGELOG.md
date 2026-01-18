@@ -2,6 +2,54 @@
 
 All notable changes to MapAnything will be documented in this file.
 
+## [1.1.0] - 2026-01-18
+
+### Added
+
+**Modular Architecture**
+- Model factory interface (`model_factory`, `init_model_from_config`) for running different 3D reconstruction models through a unified API
+- Support for external models: VGGT, DUSt3R, MASt3R, MUSt3R, Pi3-X, Pow3R, MoGe, AnyCalib, Depth Anything 3
+- Unified output format across all model wrappers (`pts3d`, `pts3d_cam`, `ray_directions`, `cam_trans`, `cam_quats`, `conf`, etc.)
+- Optional dependencies installation for external models via pip extras
+
+**New Model Capabilities**
+- DINO initialization support for Multi-View Transformer
+- Relative Pose Loss + Absolute Pose Loss training objectives
+- Memory efficient inference mode (`memory_efficient_inference=True`) enabling up to 2000 views on 140GB
+
+**New Checkpoints**
+- MapAnything V1.1 checkpoints on Hugging Face Hub
+- V1 checkpoints preserved as `facebook/map-anything-v1` and `facebook/map-anything-apache-v1`
+
+**Profiling**
+- GPU memory usage and inference speed profiling script
+- Comparison profiling against external models
+- Visualization outputs (memory and speed plots)
+
+**Datasets**
+- AerialMegaDepth dataset integration to WAI format
+- ScanNet++V2 rendering and config updates for WAI
+
+**Demos and Tools**
+- Demo script for running MapAnything on COLMAP outputs (`demo_inference_on_colmap_outputs.py`)
+- Confidence slider in Gradio demo
+- Pure local weight implementation
+
+**Documentation**
+- Copyright headers added to source files
+
+### Fixed
+- Inference with depth map as input (Issue #17)
+- COLMAP demo handling of partial pose information
+- Various misspellings across codebase
+
+### Changed
+- TA-WB download source migrated to Hugging Face Hub
+- Removed MPSD downloader script (users must accept TOS on dataset website)
+- Updated finetuning results documentation
+- Cleaned up `hf_helpers.py`
+- Updated installation instructions
+
 ## [1.0.0] - 2025-09-15
 
 ### Added

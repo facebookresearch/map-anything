@@ -19,11 +19,11 @@ from natsort import natsorted
 from tqdm import tqdm
 
 from mapanything.datasets.utils.data_splits import (
+    AerialMegaDepthSplits,
     BlendedMVSSplits,
     DL3DV10KSplits,
     ETH3DSplits,
     MegaDepthSplits,
-    AerialMegaDepthSplits,
     MPSDSplits,
     ScanNetPPSplits,
     SpringSplits,

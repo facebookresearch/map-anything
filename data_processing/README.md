@@ -2,11 +2,33 @@
 
 We use the WorldAI (WAI) format for our datasets and highly recommend using it for your own datasets. Stay tuned for our official public release! In the mean time, we provide an alpha version below to reproduce everything needed for MapAnything.
 
-We also provide a HuggingFace dataset which contains the [pre-computed metadata](#pre-computed-metadata) for easy reproducibility of training & benchmarking.
+We also provide the following two HuggingFace datasets which contain:
+1. [WAI format benchmarking data](#pre-processed-wai-format-benchmarking-data) for easy direct reproducibility of benchmarking.
+2. [Pre-computed metadata](#pre-computed-training-metadata) for easy reproducibility of training.
 
-## Public datasets converted to WAI format:
+## Table of Contents
 
-1. ✅ [Aria Synthetic Environments](https://www.projectaria.com/datasets/ase/)
+- [Public Datasets in WAI Format](#public-datasets-converted-to-wai-format)
+- [Pre-processed WAI Format Benchmarking Data](#pre-processed-wai-format-benchmarking-data)
+- [Download Instructions](#download-instructions)
+- [Installation Instructions](#installation-instructions)
+  - [Base Setup](#base-setup)
+  - [Additional MVSAnywhere Setup](#additional-mvsanywhere-setup)
+- [Running WAI Processing](#running-wai-processing)
+  - [Individual Stages](#individual-stages)
+  - [Quick Start Example for ETH3D](#quick-start-example-for-eth3d)
+  - [Batch Processing using SLURM](#batch-processing-using-slurm)
+- [Pre-computed Training Metadata](#pre-computed-training-metadata)
+- [Visualizing WAI Format Data](#visualizing-wai-format-data)
+- [Adding Custom Datasets](#adding-custom-datasets)
+- [WAI Dataset Format](#wai-dataset-format)
+  - [Folder structure](#folder-structure)
+  - [`scene_meta` format](#scene_meta-format)
+- [Citation](#citation)
+
+## Public Datasets in WAI format:
+
+1. ✅ [Aria Synthetic Environments - Internal](https://www.projectaria.com/datasets/ase/)
 2. ✅ [BlendedMVS](https://github.com/YoYo000/BlendedMVS)
 3. ✅ [DL3DV-10K](https://dl3dv-10k.github.io/DL3DV-10K/)
 4. ✅ [Dynamic Replica](https://dynamic-stereo.github.io/)
@@ -21,6 +43,20 @@ We also provide a HuggingFace dataset which contains the [pre-computed metadata]
 13. ✅ [Spring](https://spring-benchmark.org/)
 14. ✅ [TartanAirV2 Wide Baseline](https://uniflowmatch.github.io/)
 15. ✅ [UnrealStereo4K](https://github.com/fabiotosi92/SMD-Nets)
+
+## Pre-processed WAI Format Benchmarking Data
+
+To enable ease of reproducing MapAnything benchmarking, we open source the WAI format data for the test splits of ETH3D, ScanNet++V2 and TartanAirV2-WB.
+
+The benchmarking data (555 GB in total) as scene-wise zipfiles is hosted at [HuggingFace MapAnything Benchmarking Dataset](https://huggingface.co/datasets/facebook/map-anything-benchmarking) and can be downloaded and extracted using the following command:
+
+```bash
+python data_processing/download_and_extract_benchmarking_data.py \
+    --download --extract \
+    --output_dir "<your_data_dir>/map-anything-benchmarking-dataset"
+```
+
+Run with `--help` for additional options (e.g., `--delete-zips` to remove zip files after extraction, `--extract_dir` to specify a different extraction directory).
 
 ## Download Instructions:
 
@@ -148,11 +184,11 @@ python -m wai_processing.launch.slurm_stage \
 
 See `data_processing/wai_processing/configs/launch` for all the launch configs used to process the final datasets used for MapAnything.
 
-## Pre-computed Metadata
+## Pre-computed Training Metadata
 
-To enable ease of reproducing MapAnything training \& benchmarking, we open source the pre-computed covisibility matrices for all the scenes. We also provide the train, validation and test split files containing respective scene names (generated using `data_processing/aggregate_scene_names.py`).
+To enable ease of reproducing MapAnything training, we open source the pre-computed covisibility matrices for all the scenes. We also provide the train, validation and test split files containing respective scene names (generated using `data_processing/aggregate_scene_names.py`).
 
-The data (115 GB in total) is hosted on [HuggingFace Datasets](https://huggingface.co/datasets/facebook/map-anything) and can be downloaded using the following command:
+The data (215 GB in total) is hosted at [HuggingFace MapAnything Training Metadata Dataset](https://huggingface.co/datasets/facebook/map-anything) and can be downloaded using the following command:
 
 ```python
 from huggingface_hub import snapshot_download
@@ -166,7 +202,7 @@ snapshot_download(
 )
 ```
 
-## Visualizing WAI format Data
+## Visualizing WAI Format Data
 
 For ease of visualizing WAI format data after conversion, we provide a simple Rerun based visualizer:
 
@@ -336,10 +372,11 @@ Example:
 If you find our processed data, code, or repository useful, please consider giving it a star ⭐ and citing our paper in your work:
 
 ```bibtex
-@inproceedings{keetha2025mapanything,
+@inproceedings{keetha2026mapanything,
   title={{MapAnything}: Universal Feed-Forward Metric {3D} Reconstruction},
-  author={Nikhil Keetha and Norman Müller and Johannes Schönberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bulò and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
-  booktitle={arXiv},
-  year={2025}
+  author={Nikhil Keetha and Norman M\"{u}ller and Johannes Sch\"{o}nberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bul\`{o} and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
+  booktitle={International Conference on 3D Vision (3DV)},
+  year={2026},
+  organization={IEEE}
 }
 ```

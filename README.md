@@ -51,30 +51,53 @@
 
 ## Overview
 
-MapAnything is a simple, end-to-end trained transformer model that directly regresses the factored metric 3D geometry of a scene given various types of inputs (images, calibration, poses, or depth). A single feed-forward model supports over 12 different 3D reconstruction tasks including multi-image sfm, multi-view stereo, monocular metric depth estimation, registration, depth completion and more.
+MapAnything is an **open-source research framework** for universal metric 3D reconstruction. At its core is a simple, end-to-end trained transformer model that directly regresses the factored metric 3D geometry of a scene given various types of inputs (images, calibration, poses, or depth). A single feed-forward model supports over 12 different 3D reconstruction tasks including multi-image sfm, multi-view stereo, monocular metric depth estimation, registration, depth completion and more.
+
+The framework provides the **complete stack**—data processing, training, inference, and profiling—with a **modular design** that allows different 3D reconstruction models (VGGT, DUSt3R, MASt3R, MUSt3R, Pi3-X, and more) to be used interchangeably through a unified interface.
 
 ![Overview](./assets/teaser.png)
 
 ## Table of Contents
 
+- [Overview](#overview)
 - [Quick Start](#quick-start)
   - [Installation](#installation)
   - [Image-Only Inference](#image-only-inference)
   - [Multi-Modal Inference](#multi-modal-inference)
+  - [Running External Models](#running-external-models)
+    - [Available Models](#available-models)
+    - [Installation](#external-model-installation)
+    - [Quick Start Example](#external-model-quick-start)
+    - [Running Inference](#running-inference)
+    - [Unified Output Format](#unified-output-format)
+    - [Notes on Input Requirements](#notes-on-input-requirements)
 - [Interactive Demos](#interactive-demos)
   - [Online Demo](#online-demo)
   - [Local Gradio Demo](#local-gradio-demo)
   - [Rerun Demo](#rerun-demo)
   - [Demo Inference on COLMAP outputs](#demo-inference-on-colmap-outputs)
+- [Profiling](#profiling)
+  - [Profiling Results](#profiling-results)
+  - [Basic Profiling](#basic-profiling)
+  - [Comparing with External Models](#comparing-with-external-models)
+  - [Command-Line Arguments](#command-line-arguments)
+  - [Output Files](#output-files)
 - [COLMAP & GSplat Support](#colmap--gsplat-support)
   - [Exporting to COLMAP Format](#exporting-to-colmap-format)
+  - [Visualizing COLMAP Reconstruction in Rerun](#visualizing-colmap-reconstruction-in-rerun)
   - [Integration with Gaussian Splatting](#integration-with-gaussian-splatting)
 - [Data Processing for Training & Benchmarking](#data-processing-for-training--benchmarking)
 - [Training](#training)
 - [Benchmarking](#benchmarking)
+  - [Available Benchmarks](#available-benchmarks)
 - [Code License](#code-license)
 - [Models](#models)
+  - [Hugging Face Hub Models](#-hugging-face-hub-models)
+  - [Hugging Face Hub Models (V1 Release)](#-hugging-face-hub-models-used-for-v1-release-in-september-2025)
+  - [Model Selection Guide](#model-selection-guide)
+  - [Optional Checkpoint Conversion](#optional-checkpoint-conversion)
 - [Building Blocks for MapAnything](#building-blocks-for-mapanything)
+  - [Related Research](#related-research)
 - [Acknowledgments](#acknowledgments)
 - [Citation](#citation)
 
@@ -95,7 +118,9 @@ conda activate mapanything
 pip install -e .
 
 # For all optional dependencies
-# See pyproject.toml for more details
+# This includes external model support (VGGT, DUSt3R, MASt3R, MUSt3R, Pi3-X, DA3, etc.)
+# See "Running External Models" section for more details
+# See pyproject.toml for more details on installed packages
 pip install -e ".[all]"
 pre-commit install
 ```
@@ -130,13 +155,15 @@ views = load_images(images)
 # Run inference
 predictions = model.infer(
     views,                            # Input views
-    memory_efficient_inference=False, # Trades off speed for more views (up to 2000 views on 140 GB)
+    memory_efficient_inference=True,  # Trades off speed for more views (up to 2000 views on 140 GB). Trade off is negligible - see profiling section
+    minibatch_size=None,              # Minibatch size for memory-efficient inference (use 1 for smallest GPU memory consumption). Default is dynamic computation based on available GPU memory.
     use_amp=True,                     # Use mixed precision inference (recommended)
     amp_dtype="bf16",                 # bf16 inference (recommended; falls back to fp16 if bf16 not supported)
     apply_mask=True,                  # Apply masking to dense geometry outputs
     mask_edges=True,                  # Remove edge artifacts by using normals and depth
     apply_confidence_mask=False,      # Filter low-confidence regions
     confidence_percentile=10,         # Remove bottom 10 percentile confidence pixels
+    use_multiview_confidence=False,   # Enable multi-view depth consistency based confidence in place of learning-based one
 )
 
 # Access results for each view - Complete list of metric outputs
@@ -325,13 +352,15 @@ processed_views = preprocess_inputs(views_example)
 # Run inference with any combination of inputs
 predictions = model.infer(
     processed_views,                  # Any combination of input views
-    memory_efficient_inference=False, # Trades off speed for more views (up to 2000 views on 140 GB)
+    memory_efficient_inference=True, # Trades off speed for more views (up to 2000 views on 140 GB). Trade off is negligible - see profiling section
+    minibatch_size=None,              # Minibatch size for memory-efficient inference (use 1 for smallest GPU memory consumption). Default is dynamic computation based on available GPU memory.
     use_amp=True,                     # Use mixed precision inference (recommended)
     amp_dtype="bf16",                 # bf16 inference (recommended; falls back to fp16 if bf16 not supported)
     apply_mask=True,                  # Apply masking to dense geometry outputs
     mask_edges=True,                  # Remove edge artifacts by using normals and depth
     apply_confidence_mask=False,      # Filter low-confidence regions
     confidence_percentile=10,         # Remove bottom 10 percentile confidence pixels
+    use_multiview_confidence=False,   # Enable multi-view depth consistency based confidence in place of learning-based one
     # Control which inputs to use/ignore
     # By default, all inputs are used when provided
     # If is_metric_scale flag is not provided, all inputs are assumed to be in metric scale
@@ -362,6 +391,148 @@ predictions = model.infer(
 - Cannot provide both `intrinsics` and `ray_directions` simultaneously (they are redundant)
 
 The above constraints are enforced in the inference API. However, if desired, the underlying `model.forward` can support any arbitrary combination of inputs (a total of 64 configurations; without counting per view flexibility).
+
+### Running External Models
+
+The MapAnything codebase is **modular** — different 3D reconstruction models can be used interchangeably through a unified model factory interface. All model wrappers produce outputs in a **unified format** following MapAnything conventions (`pts3d`, `pts3d_cam`, `ray_directions`, `depth_along_ray`, `cam_trans`, `cam_quats`, `conf`, etc.). This enables fair comparison, benchmarking, and easy experimentation across methods.
+
+#### Available Models
+
+| Model Key | Description | Resolution | Data Norm Type | Install Extra |
+|-----------|-------------|------------|----------------|---------------|
+| `mapanything` | MapAnything | 518 | `dinov2` | (base) |
+| `mapanything_ablations` | MapAnything ablations | 518 | `dinov2` | (base) |
+| `modular_dust3r` | ModularDUSt3R | 512 | `dust3r` | (base) |
+| `vggt` | VGGT 1B | 518 | `identity` | (base) |
+| `dust3r` | DUSt3R + Global BA | 512 | `dust3r` | `dust3r` |
+| `mast3r` | MASt3R + SGA | 512 | `dust3r` | `mast3r` |
+| `moge` | MoGe | 518 | `identity` | (base) |
+| `must3r` | MUSt3R | 512 | `dust3r` | `must3r` |
+| `pi3` | π³ | 518 | `identity` | (base) |
+| `pi3x` | π³-X | 518 | `identity` | `pi3` |
+| `pow3r` | Pow3R | 512 | `dust3r` | `pow3r` |
+| `pow3r_ba` | Pow3R + BA | 512 | `dust3r` | `pow3r` |
+| `anycalib` | AnyCalib | - | - | `anycalib` |
+| `da3` | Depth Anything 3 | 504 | `dinov2` | `depth-anything-3` |
+
+#### Installation {#external-model-installation}
+
+Install optional dependencies for external models:
+
+```bash
+# Install specific external model dependencies
+pip install -e ".[dust3r]"           # DUSt3R
+pip install -e ".[mast3r]"           # MASt3R
+pip install -e ".[pi3]"              # π³-X (note: π³ base works without this)
+pip install -e ".[pow3r]"            # Pow3R
+pip install -e ".[anycalib]"         # AnyCalib
+pip install -e ".[must3r]"           # MUSt3R
+pip install -e ".[depth-anything-3]" # Depth Anything 3
+
+# Or install all external model dependencies
+pip install -e ".[all]"
+```
+
+#### Quick Start Example {#external-model-quick-start}
+
+**Example 1: Using `init_model_from_config` (recommended)**
+
+```python
+from mapanything.models import init_model_from_config
+
+# Initialize model by name - handles Hydra config composition automatically
+# Options are based on configs available in configs/model
+# The model is returned on the specified device
+model = init_model_from_config("vggt", device="cuda")
+
+# Other examples:
+# model = init_model_from_config("pi3x", device="cuda")
+# model = init_model_from_config("da3_nested", device="cuda")
+# Note: For MUSt3R, the values in configs/machine/default.yaml need to be populated to enable checkpoint loading
+# model = init_model_from_config("must3r", device="cuda")
+```
+
+**Example 2: Using `model_factory` directly**
+
+```python
+from mapanything.models import model_factory, get_available_models
+
+# List all available models
+print(get_available_models())
+# ['mapanything', 'mapanything_ablations', 'modular_dust3r', 'anycalib',
+#  'da3', 'dust3r', 'mast3r', 'moge', 'must3r', 'pi3', 'pi3x', 'pow3r',
+#  'pow3r_ba', 'vggt']
+
+# Initialize external model
+# Requires passing in additional model config arguments as kwargs
+# model = model_factory("model_name", **model_config_kwargs)
+model = model_factory("vggt", name="vggt", torch_hub_force_reload=False)
+model = model.to("cuda")
+```
+
+#### Running Inference
+
+All model wrappers follow the same `forward()` interface. The model expects a list of view dictionaries as input and returns a list of prediction dictionaries:
+
+```python
+import torch
+from mapanything.utils.image import load_images
+
+# Load and preprocess images from a folder
+# This handles resizing and normalization based on model requirements
+views = load_images(
+    folder_or_list="path/to/images",  # Folder path or list of image paths
+    resolution_set=518,               # Model-specific resolution (see table above)
+    norm_type="dinov2",               # Model-specific normalization (see table above)
+    patch_size=14,
+)
+
+# Run inference
+model.eval()
+with torch.no_grad():
+    with torch.autocast("cuda"):
+        predictions = model(views)
+
+# predictions is a list of dicts, one per input view
+# See the Unified Output Format section below for more details
+```
+
+Each input view dictionary must contain at minimum an `img` tensor of shape `(B, 3, H, W)` with the appropriate normalization applied. The `load_images` utility handles this preprocessing automatically. For more advanced inference patterns including loss computation and device handling, see the `loss_of_one_batch_multi_view` function in `mapanything/utils/inference.py`.
+
+#### Unified Output Format
+
+All model wrappers produce outputs in a consistent format:
+
+| Output Key | Description |
+|------------|-------------|
+| `pts3d` | 3D points in world coordinates |
+| `pts3d_cam` | 3D points in camera coordinates |
+| `ray_directions` | Ray directions in camera frame |
+| `depth_along_ray` | Depth along ray |
+| `cam_trans` | Camera translation (cam2world) |
+| `cam_quats` | Camera quaternion (cam2world) |
+| `conf` | Per-pixel confidence scores |
+
+This unified output format allows:
+- Fair comparison between methods
+- Easy swapping of models for experimentation
+- Consistent downstream processing pipelines
+
+#### Notes on Input Requirements
+
+Different models have different input requirements:
+
+**Resolution - Longest Side**:
+- 518px: MapAnything, VGGT, MoGe, Pi3, Pi3X
+- 512px: DUSt3R, MASt3R, MUSt3R, Pow3R
+- 504px: Depth Anything 3
+
+**Data Normalization (`data_norm_type`)**:
+- `dinov2`: MapAnything, Depth Anything 3
+- `identity`: VGGT, MoGe, Pi3, Pi3X
+- `dust3r`: DUSt3R, MASt3R, MUSt3R, Pow3R
+
+For training and fine-tuning external models, see the [Training README](train.md) for detailed instructions.
 
 ## Interactive Demos
 
@@ -398,7 +569,6 @@ We provide a demo script for interactive 3D visualization of metric reconstructi
 rerun --serve --port 2004 --web-viewer-port 2006
 
 # Terminal 2: Run MapAnything demo
-# Use --memory_efficient_inference for running inference on a larger number of views
 python scripts/demo_images_only_inference.py \
     --image_folder /path/to/your/images \
     --viz \
@@ -408,32 +578,123 @@ python scripts/demo_images_only_inference.py \
 # Terminal 3 or Local Machine: Open web viewer at http://127.0.0.1:2006 (You might need to port forward if using a remote server)
 ```
 
-Use `--apache` flag to use the Apache 2.0 licensed model. Optionally, if rerun is installed locally, local rerun viewer can be spawned using: `rerun --connect rerun+http://127.0.0.1:2004/proxy`.
+Additional options:
+- `--apache`: Use the Apache 2.0 licensed model
+- `--video_viz_for_rerun`: Enable video-style visualization with time indexing
+- `--log_only_imgs_for_rerun_cams`: Log only images for Rerun cameras (skip depth/mask)
+
+Optionally, if rerun is installed locally, local rerun viewer can be spawned using: `rerun --connect rerun+http://127.0.0.1:2004/proxy`.
 
 ### Demo Inference on COLMAP outputs
 
-We provide a demo script to run MapAnything inference on COLMAP outputs. The script runs MapAnything in MVS mode by default. Use the `--help` flag for more info.
+We provide a demo script to run MapAnything inference on COLMAP outputs. The script runs MapAnything in MVS mode by default (using COLMAP calibration and poses as input). Use the `--help` flag for more info.
 
 ```bash
 # Terminal 1: Start the Rerun server
 rerun --serve --port 2004 --web-viewer-port 2006
 
 # Terminal 2: Run MapAnything inference on COLMAP output folder
-# Use --memory_efficient_inference for running inference on a larger number of views
 python scripts/demo_inference_on_colmap_outputs.py \
     --colmap_path /path/to/your/colmap_output \
-    --viz \
-    --save_glb \
-    --output_path /path/to/output.glb
+    --viz
 
 # Terminal 3 or Local Machine: Open web viewer at http://127.0.0.1:2006 (You might need to port forward if using a remote server)
 ```
 
-Use `--apache` flag to use the Apache 2.0 licensed model. Optionally, if rerun is installed locally, local rerun viewer can be spawned using: `rerun --connect rerun+http://127.0.0.1:2004/proxy`.
+Additional options:
+- `--apache`: Use the Apache 2.0 licensed model
+- `--stride N`: Load every Nth image (default: 1)
+- `--ext .bin/.txt`: COLMAP file extension (default: .bin)
+- `--ignore_calibration_inputs`: Ignore COLMAP calibration (use only images and poses)
+- `--ignore_pose_inputs`: Ignore COLMAP poses (use only images and calibration)
+- `--save_colmap`: Export results in COLMAP format
+- `--save_glb`: Save reconstruction as GLB file
+- `--output_directory`: Output directory for COLMAP or GLB exports (default: colmap_mapanything_output)
+- `--verbose`: Enable verbose loading output
+
+Optionally, if rerun is installed locally, local rerun viewer can be spawned using: `rerun --connect rerun+http://127.0.0.1:2004/proxy`.
+
+## Profiling
+
+Profile GPU memory usage and inference speed of MapAnything across different view counts. The profiling script supports comparison with external models and outputs both JSON results and visualizations.
+
+### Profiling Results
+
+MapAnything achieves the best speed and memory profile compared to existing methods, enabling efficient inference across a wide range of view counts.
+
+<table>
+<tr>
+<td><img src="./assets/profiling_memory.png" alt="Memory Profiling" width="100%"></td>
+<td><img src="./assets/profiling_speed.png" alt="Speed Profiling" width="100%"></td>
+</tr>
+<tr>
+<td align="center"><b>Peak GPU Memory vs Number of Views</b></td>
+<td align="center"><b>Inference Speed vs Number of Views</b></td>
+</tr>
+</table>
+
+**Note on Memory Efficient Mode:** MapAnything (Mem Efficient) in the plots refers to using `memory_efficient_inference=True` with mini batch size 1 in the `.infer()` and `.forward()` calls. This mode trades off speed for reduced memory consumption, enabling inference on a larger number of views (up to 2000 views on 140 GB). As seen in the plots, the speed trade off is negligible.
+
+### Basic Profiling
+
+```bash
+# Profile MapAnything (default and memory-efficient modes)
+python scripts/profile_memory_runtime.py \
+    --output_dir /path/to/results
+
+# Profile with a specific checkpoint
+python scripts/profile_memory_runtime.py \
+    --output_dir /path/to/results \
+    --mapanything_checkpoint /path/to/checkpoint.pth
+
+# Use Apache 2.0 licensed model
+python scripts/profile_memory_runtime.py \
+    --output_dir /path/to/results \
+    --apache
+```
+
+### Comparing with External Models
+
+External models are loaded using their Hydra config files from `configs/model/<model_name>.yaml`. Make sure the required dependencies are installed (see [Running External Models](#running-external-models)).
+
+```bash
+# Compare MapAnything with external models
+python scripts/profile_memory_runtime.py \
+    --output_dir /path/to/results \
+    --external_models vggt pi3x must3r
+
+# Custom view counts
+python scripts/profile_memory_runtime.py \
+    --output_dir /path/to/results \
+    --num_views 2 4 8 16 32 64
+```
+
+**Available external models:** `vggt`, `pi3`, `pi3x`, `dust3r`, `mast3r`, `must3r`, `pow3r`, `pow3r_ba`, `da3`, `da3_nested`, `moge_1`, `moge_2`
+
+### Command-Line Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `--output_dir` | Directory to save results | Required |
+| `--num_views` | List of view counts to profile | 2 4 8 16 24 32 50 100 200 500 1000 |
+| `--external_models` | External model names to compare | None |
+| `--mapanything_checkpoint` | Path to MapAnything checkpoint | None (uses HuggingFace) |
+| `--apache` | Use Apache 2.0 licensed model | False |
+| `--warmup_runs` | Number of warmup iterations | 3 |
+| `--timed_runs` | Number of timed iterations | 5 |
+| `--skip_mem_efficient` | Skip memory-efficient mode profiling | False |
+
+### Output Files
+
+The script generates the following outputs in the specified directory:
+
+- `profiling_results.json`: Raw profiling data with memory and timing statistics
+- `profiling_memory.png`: Plot of peak GPU memory usage vs number of views
+- `profiling_speed.png`: Plot of inference frequency (Hz) vs number of views
 
 ## COLMAP & GSplat Support
 
-We build on top of [VGGT's COLMAP demo](https://github.com/facebookresearch/vggt?tab=readme-ov-file#exporting-to-colmap-format) to enable support for COLMAP & GSplat.
+MapAnything predictions can be exported to COLMAP format for use with Gaussian Splatting and other downstream applications.
 
 ### Exporting to COLMAP Format
 
@@ -443,33 +704,60 @@ MapAnything's predictions can directly be converted to COLMAP format by using:
 # Install requirements for this specific demo
 pip install -e ".[colmap]"
 
-# Feed-forward prediction only
-# Use the memory efficient inference flag to run on a larger number of images at the cost of slower speed
-python scripts/demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ --memory_efficient_inference
+# Export MapAnything predictions to COLMAP format
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/
 
-# With bundle adjustment
-python scripts/demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ --memory_efficient_inference --use_ba
+# With custom voxel fraction (default: 0.01 = 1% of IQR-based scene extent)
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/ --voxel_fraction=0.002
 
-# Run with bundle adjustment using reduced parameters for faster processing
-# Reduces max_query_pts from 4096 (default) to 2048 and query_frame_num from 8 (default) to 5
-# Trade-off: Faster execution but potentially less robust reconstruction in complex scenes (you may consider setting query_frame_num equal to your total number of images)
-# See demo_colmap.py for additional bundle adjustment configuration options
-python scripts/demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ --memory_efficient_inference --use_ba --max_query_pts=2048 --query_frame_num=5
+# With explicit voxel size in meters (overrides --voxel_fraction)
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/ --voxel_size=0.01
+
+# Use Apache 2.0 licensed model
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/ --apache
+
+# Also save dense reconstruction as GLB file
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/ --save_glb
+
+# Skip Point2D backprojection for faster export
+python scripts/demo_colmap.py --images_dir=/YOUR/IMAGES_DIR/ --output_dir=/YOUR/OUTPUT_DIR/ --skip_point2d
 ```
 
-Please ensure that the images are stored in `/YOUR/SCENE_DIR/images/`. This folder should contain only the images. Check the examples folder for the desired data structure.
-
-The reconstruction result (camera parameters and 3D points) will be automatically saved under `/YOUR/SCENE_DIR/sparse/` in the COLMAP format, such as:
+The output is a self-contained COLMAP reconstruction with processed images (at model inference resolution) and camera parameters:
 
 ```
-SCENE_DIR/
-├── images/
+OUTPUT_DIR/
+├── images/           # Processed images (matching intrinsics resolution)
+│   ├── img1.jpg
+│   └── img2.jpg
 └── sparse/
     ├── cameras.bin
     ├── images.bin
-    └── points3D.bin
+    ├── points3D.bin
     └── points.ply
 ```
+
+### Visualizing COLMAP Reconstruction in Rerun
+
+You can visualize the exported COLMAP reconstruction using Rerun:
+
+```bash
+# Terminal 1: Start the Rerun server
+rerun --serve --port 2004 --web-viewer-port 2006
+
+# Terminal 2: Visualize the COLMAP reconstruction
+python scripts/visualize_colmap_format_in_rerun.py --scene_dir=/YOUR/OUTPUT_DIR/ --connect
+
+# With images and keypoints
+python scripts/visualize_colmap_format_in_rerun.py --scene_dir=/YOUR/OUTPUT_DIR/ --show_images --show_keypoints --connect
+
+# Filter noisy points (by track length, primarily useful for traditional SfM outputs)
+python scripts/visualize_colmap_format_in_rerun.py --scene_dir=/YOUR/OUTPUT_DIR/ --filter --min_track_length=4 --connect
+
+# Terminal 3 or Local Machine: Open web viewer at http://127.0.0.1:2006
+```
+
+Optionally, if Rerun is installed locally, the local Rerun viewer can be spawned using: `rerun --connect rerun+http://127.0.0.1:2004/proxy`.
 
 ### Integration with Gaussian Splatting
 
@@ -478,7 +766,7 @@ The exported COLMAP files can be directly used with [gsplat](https://github.com/
 An example command to train the model is:
 ```
 cd <path_to_gsplat>
-python examples/simple_trainer.py  default --data_factor 1 --data_dir /YOUR/SCENE_DIR/ --result_dir /YOUR/RESULT_DIR/
+python examples/simple_trainer.py  default --data_factor 1 --data_dir /YOUR/OUTPUT_DIR/ --result_dir /YOUR/RESULT_DIR/
 ```
 
 ## Data Processing for Training & Benchmarking
@@ -521,7 +809,7 @@ We release **two variants** of the pre-trained MapAnything models on Hugging Fac
 1. **[facebook/map-anything](https://huggingface.co/facebook/map-anything)** (CC-BY-NC 4.0 License)
 2. **[facebook/map-anything-apache](https://huggingface.co/facebook/map-anything-apache)** (Apache 2.0 License)
 
-### Deprecated Models used for V1 Release in September 2025
+### 🤗 Hugging Face Hub Models used for V1 Release in September 2025
 
 1. **[facebook/map-anything-v1](https://huggingface.co/facebook/map-anything-v1)** (CC-BY-NC 4.0 License)
 2. **[facebook/map-anything-apache-v1](https://huggingface.co/facebook/map-anything-apache-v1)** (Apache 2.0 License)
@@ -575,10 +863,11 @@ We thank the following projects for their open-source code: [DUSt3R](https://git
 If you find our repository useful, please consider giving it a star ⭐ and citing our paper in your work:
 
 ```bibtex
-@misc{keetha2025mapanything,
+@inproceedings{keetha2026mapanything,
   title={{MapAnything}: Universal Feed-Forward Metric {3D} Reconstruction},
   author={Nikhil Keetha and Norman M\"{u}ller and Johannes Sch\"{o}nberger and Lorenzo Porzi and Yuchen Zhang and Tobias Fischer and Arno Knapitsch and Duncan Zauss and Ethan Weber and Nelson Antunes and Jonathon Luiten and Manuel Lopez-Antequera and Samuel Rota Bul\`{o} and Christian Richardt and Deva Ramanan and Sebastian Scherer and Peter Kontschieder},
-  note={arXiv preprint arXiv:2509.13414},
-  year={2025}
+  booktitle={International Conference on 3D Vision (3DV)},
+  year={2026},
+  organization={IEEE}
 }
 ```

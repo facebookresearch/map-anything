@@ -7,9 +7,11 @@ Converts AerialMegaDepth dataset to WAI format.
 
 Reference: https://github.com/kvuong2711/aerial-megadepth/blob/main/data_generation/datasets_preprocess/preprocess_aerialmegadepth.py
 """
+
 import logging
 import os
 from pathlib import Path
+
 import cv2
 import h5py
 import numpy as np
@@ -22,8 +24,6 @@ from wai_processing.utils.wrapper import convert_scenes_wrapper
 
 from mapanything.utils.wai.core import store_data
 from mapanything.utils.wai.scene_frame import _filter_scenes
-import shutil
-
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,13 @@ def _load_kpts_and_poses(root, scene_name, z_only=False, intrinsics=True):
     if intrinsics:
         with open(
             os.path.join(
-                root, scene_name, "sfm_output_localization", "sfm_superpoint+superglue", "localized_dense_metric", "sparse-txt", "cameras.txt"
+                root,
+                scene_name,
+                "sfm_output_localization",
+                "sfm_superpoint+superglue",
+                "localized_dense_metric",
+                "sparse-txt",
+                "cameras.txt",
             ),
             "r",
         ) as f:
@@ -70,7 +76,15 @@ def _load_kpts_and_poses(root, scene_name, z_only=False, intrinsics=True):
             )
 
     with open(
-        os.path.join(root, scene_name, "sfm_output_localization", "sfm_superpoint+superglue", "localized_dense_metric", "sparse-txt", "images.txt"),
+        os.path.join(
+            root,
+            scene_name,
+            "sfm_output_localization",
+            "sfm_superpoint+superglue",
+            "localized_dense_metric",
+            "sparse-txt",
+            "images.txt",
+        ),
         "r",
     ) as f:
         raw = f.read().splitlines()[4:]  # skip the header
@@ -185,7 +199,12 @@ def process_aerialmegadepth_scene(cfg, scene_name):
 
     # Get the scene path and dense directory for this subscene
     scene_path = Path(cfg.original_root) / scene_name
-    dense_dir = scene_path / "sfm_output_localization" / "sfm_superpoint+superglue" / "localized_dense_metric"
+    dense_dir = (
+        scene_path
+        / "sfm_output_localization"
+        / "sfm_superpoint+superglue"
+        / "localized_dense_metric"
+    )
 
     # Load megadepth_pairs.npz to filter images
     pairs_path = Path(cfg.original_root) / "aerial_megadepth_all.npz"
@@ -197,7 +216,7 @@ def process_aerialmegadepth_scene(cfg, scene_name):
     # Load pairs data
     data = np.load(pairs_path, allow_pickle=True)
     images = data["images"]
-    images_scene_name = data['images_scene_name']
+    images_scene_name = data["images_scene_name"]
 
     # Find images for this scene
     images_to_process = set()
@@ -208,7 +227,7 @@ def process_aerialmegadepth_scene(cfg, scene_name):
 
     # Collect all images for this scene from the pairs
     for image_idx, image_id in enumerate(images):
-        if image_id != None:
+        if image_id is not None:
             scene = images_scene_name[image_idx]
             # Check if this pair belongs to our scene
             if isinstance(scene, str) and scene == current_scene:
@@ -265,7 +284,7 @@ def process_aerialmegadepth_scene(cfg, scene_name):
         segmask_path = segmasks_dir / (image_id + ".png")
         assert segmask_path.exists(), f"Segmentation mask not found at {segmask_path}"
         segmask = cv2.imread(str(segmask_path))[:, :, 0]
-        depthmap[segmask == 2] = 0 # Remove the sky from the depthmap (ADE20K)
+        depthmap[segmask == 2] = 0  # Remove the sky from the depthmap (ADE20K)
 
         # Save depth map to EXR file using WAI
         rel_depth_out_path = Path("depth") / (Path(image_id).stem + ".exr")
@@ -336,7 +355,7 @@ def get_original_scene_names(
     # First pass: collect all subscenes for each scene
     for scene_name in original_scene_names:
         scene_path = Path(cfg.original_root) / scene_name
-        if scene_path.is_dir() and 'sfm_output_localization' in os.listdir(scene_path):
+        if scene_path.is_dir() and "sfm_output_localization" in os.listdir(scene_path):
             all_scene_names.append(scene_name)
     # scene filter for batch processing
     all_scene_names = _filter_scenes(

@@ -16,8 +16,8 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     machine=aws \
     dataset=bmvs_518_many_ar_48ipg_8g dataset.num_workers=12 \
     dataset.num_views=4 \
-    loss=overall_loss_weigh_pm_higher \
-    model=mapanything \
+    loss=overall_loss_highpm_plus_rel_pose \
+    model=mapanything_dino_init \
     model/task=images_only \
     model.encoder.uses_torch_hub=false \
     model.encoder.gradient_checkpointing=true \

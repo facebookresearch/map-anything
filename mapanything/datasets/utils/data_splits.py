@@ -1600,8 +1600,8 @@ class AerialMegaDepthSplits:
         """
         Validation split is based on scenes used in DUSt3R.
         """
-        self.val_split_scenes = ["0015", "0015", "0022"]
-        
+        self.val_split_scenes = ["0015", "0022"]
+
 
 class SpringSplits:
     """

@@ -29,7 +29,16 @@ from mapanything.utils.viz import (
 
 
 def log_data_to_rerun(
-    image, depthmap, pose, intrinsics, pts3d, mask, base_name, pts_name, viz_mask=None
+    image,
+    depthmap,
+    pose,
+    intrinsics,
+    pts3d,
+    mask,
+    base_name,
+    pts_name,
+    viz_mask=None,
+    log_only_imgs_for_rerun_cams=False,
 ):
     """Log visualization data to Rerun"""
     # Log camera info and loaded data
@@ -55,15 +64,16 @@ def log_data_to_rerun(
         f"{base_name}/pinhole/rgb",
         rr.Image(image),
     )
-    rr.log(
-        f"{base_name}/pinhole/depth",
-        rr.DepthImage(depthmap),
-    )
-    if viz_mask is not None:
+    if not log_only_imgs_for_rerun_cams:
         rr.log(
-            f"{base_name}/pinhole/mask",
-            rr.SegmentationImage(viz_mask.astype(int)),
+            f"{base_name}/pinhole/depth",
+            rr.DepthImage(depthmap),
         )
+        if viz_mask is not None:
+            rr.log(
+                f"{base_name}/pinhole/mask",
+                rr.SegmentationImage(viz_mask.astype(int)),
+            )
 
     # Log points in 3D
     filtered_pts = pts3d[mask]
@@ -90,12 +100,6 @@ def get_parser():
         help="Path to folder containing images for reconstruction",
     )
     parser.add_argument(
-        "--memory_efficient_inference",
-        action="store_true",
-        default=False,
-        help="Use memory efficient inference for reconstruction (trades off speed)",
-    )
-    parser.add_argument(
         "--apache",
         action="store_true",
         help="Use Apache 2.0 licensed model (facebook/map-anything-apache)",
@@ -117,6 +121,18 @@ def get_parser():
         type=str,
         default="output.glb",
         help="Output path for GLB file (default: output.glb)",
+    )
+    parser.add_argument(
+        "--video_viz_for_rerun",
+        action="store_true",
+        default=False,
+        help="Video visualization for Rerun - logs views with time index",
+    )
+    parser.add_argument(
+        "--log_only_imgs_for_rerun_cams",
+        action="store_true",
+        default=False,
+        help="Log only images for Rerun camera - no depth, mask, etc.",
     )
 
     return parser
@@ -148,10 +164,16 @@ def main():
     views = load_images(args.image_folder)
     print(f"Loaded {len(views)} views")
 
-    # Run model inference
+    # Run model inference with memory-efficient defaults
     print("Running inference...")
     outputs = model.infer(
-        views, memory_efficient_inference=args.memory_efficient_inference
+        views,
+        memory_efficient_inference=True,
+        minibatch_size=1,
+        use_amp=True,
+        amp_dtype="bf16",
+        apply_mask=True,
+        mask_edges=True,
     )
     print("Inference complete!")
 
@@ -163,7 +185,10 @@ def main():
     # Initialize Rerun if visualization is enabled
     if args.viz:
         print("Starting visualization...")
-        viz_string = "MapAnything_Visualization"
+        if args.video_viz_for_rerun:
+            viz_string = "MapAnything_Video_Visualization"
+        else:
+            viz_string = "MapAnything_Visualization"
         rr.script_setup(args, viz_string)
         rr.set_time("stable_time", sequence=0)
         rr.log("mapanything", rr.ViewCoordinates.RDF, static=True)
@@ -194,6 +219,11 @@ def main():
 
         # Log to Rerun if visualization is enabled
         if args.viz:
+            if args.video_viz_for_rerun:
+                rr.set_time("stable_time", sequence=view_idx)
+                view_base_name = "mapanything/view"
+            else:
+                view_base_name = f"mapanything/view_{view_idx}"
             log_data_to_rerun(
                 image=image_np,
                 depthmap=depthmap_torch.cpu().numpy(),
@@ -201,9 +231,10 @@ def main():
                 intrinsics=intrinsics_torch.cpu().numpy(),
                 pts3d=pts3d_np,
                 mask=mask,
-                base_name=f"mapanything/view_{view_idx}",
+                base_name=view_base_name,
                 pts_name=f"mapanything/pointcloud_view_{view_idx}",
                 viz_mask=mask,
+                log_only_imgs_for_rerun_cams=args.log_only_imgs_for_rerun_cams,
             )
 
     if args.viz:

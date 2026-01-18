@@ -203,7 +203,7 @@ def get_dataset_config(dataset_type):
             "confidence_thres": 0.0,
         },
         "aerialmegadepth": {
-            "root_dir": "/fsx/xrtech/data/aerialmegadepth",
+            "root_dir": "/ai4rl/fsx/xrtech/data/aerialmegadepth",
             "scene": "0001",
             "depth_key": "depth",
             "local_frame": False,

@@ -9,13 +9,13 @@ MapAnything Datasets
 
 import torch
 
+from mapanything.datasets.wai.aerialmegadepth import AerialMegaDepthWAI  # noqa
 from mapanything.datasets.wai.ase import ASEWAI  # noqa
 from mapanything.datasets.wai.blendedmvs import BlendedMVSWAI  # noqa
 from mapanything.datasets.wai.dl3dv import DL3DVWAI  # noqa
 from mapanything.datasets.wai.dynamicreplica import DynamicReplicaWAI  # noqa
 from mapanything.datasets.wai.eth3d import ETH3DWAI  # noqa
 from mapanything.datasets.wai.megadepth import MegaDepthWAI  # noqa
-from mapanything.datasets.wai.aerialmegadepth import AerialMegaDepthWAI  # noqa
 from mapanything.datasets.wai.mpsd import MPSDWAI  # noqa
 from mapanything.datasets.wai.mvs_synth import MVSSynthWAI  # noqa
 from mapanything.datasets.wai.paralleldomain4d import ParallelDomain4DWAI  # noqa
