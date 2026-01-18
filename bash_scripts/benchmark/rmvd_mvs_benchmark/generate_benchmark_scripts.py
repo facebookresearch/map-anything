@@ -17,7 +17,7 @@ def get_model_settings(model: str, dataset: str):
     if model == "mapanything":
         return {
             "model": "mapanything",
-            "model.pretrained": "\\${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_36ipg_64g/checkpoint-last.pth",
+            "model.pretrained": "\\${root_experiments_dir}/mapanything/training/mapa_v1_1/checkpoint-last.pth",
             "evaluation_resolution": "\\${dataset.resolution_options.518_1_33_ar}"
             if dataset != "kitti"
             else "\\${dataset.resolution_options.518_3_20_ar}",

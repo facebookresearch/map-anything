@@ -477,7 +477,11 @@ def train_one_epoch(
             )  # scale the loss relative to the number of views (base is 2 views)
         loss_value = float(loss)
 
-        if not math.isfinite(loss_value) or (loss_value > 1000):
+        check_instability = not math.isfinite(loss_value) or (
+            args.train_params.check_loss_instability
+            and loss_value > args.train_params.max_loss_value
+        )
+        if check_instability:
             print("Loss is {}, stopping training".format(loss_value), force=True)
             print(f"Loss Details: {loss_details}", force=True)
             print(f"Epoch: {epoch}, Data Iteration: {data_iter_step}", force=True)

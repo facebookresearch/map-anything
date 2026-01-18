@@ -32,9 +32,10 @@ data = ["pandas"]
 dev = ["pre-commit", "pytest", "pytest-cov", "ruff"]
 colmap = [
     "lightglue @ git+https://github.com/cvg/LightGlue.git",
+    "open3d",
     "pycolmap==3.10.0"
 ]
-gradio = ["gradio", "spaces"]
+gradio = ["gradio==5.47.2", "spaces"]
 radio = ["timm"]
 # External models for benchmarking
 anycalib = ["anycalib @ git+https://github.com/javrtg/AnyCalib.git@main#egg=anycalib"]
@@ -44,6 +45,7 @@ dust3r = [
 ]
 mast3r = ["mast3r @ git+https://github.com/Nik-V9/mast3r.git@main#egg=mast3r"]
 must3r = ["must3r @ git+https://github.com/naver/must3r.git@main#egg=must3r"]
+pi3 = ["pi3 @ git+https://github.com/yyfz/Pi3.git@main#egg=pi3"]
 pow3r = ["pow3r @ git+https://github.com/Nik-V9/pow3r.git@main#egg=pow3r"]
 depth-anything-3 = ["depth-anything-3 @ git+https://github.com/Nik-V9/depth-anything-3.git@main#egg=depth-anything-3"]
 rmvd = ["rmvd @ git+https://github.com/infinity1096/robustmvd.git@master#egg=rmvd"]
@@ -59,6 +61,7 @@ all = [
     "mapanything[gradio]",
     "mapanything[mast3r]",
     "mapanything[must3r]",
+    "mapanything[pi3]",
     "mapanything[pow3r]",
     "mapanything[radio]",
     "mapanything[rmvd]",

@@ -113,7 +113,7 @@ class AerialMegaDepthWAI(BaseDataset):
             view_data = load_frame(
                 scene_root,
                 view_file_name,
-                modalities=["image", "depth"], # "pred_mask/moge2"],
+                modalities=["image", "depth"],  # "pred_mask/moge2"],
                 scene_meta=scene_meta,
             )
 

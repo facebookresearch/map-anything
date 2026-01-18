@@ -6,7 +6,21 @@ This benchmark evaluates a method's ability to predict camera intrinsics from si
 
 ## Prepare Evaluation Data
 
-Process the test datasets to WAI format before running the benchmark. See [Data Processing README](../../data_processing/README.md) for WAI format details and conversion instructions.
+### Option 1: Download Pre-processed Data (Recommended)
+
+Download and extract the pre-processed WAI format benchmarking data directly from HuggingFace:
+
+```bash
+python data_processing/download_and_extract_benchmarking_data.py \
+    --download --extract \
+    --output_dir "<your_data_dir>/map-anything-benchmarking-dataset"
+```
+
+The downloaded data includes test splits for ETH3D, ScanNet++V2, and TartanAirV2-WB in WAI format. Run with `--help` for additional options.
+
+### Option 2: Process Data Yourself
+
+Alternatively, process the test datasets to WAI format manually. See [Data Processing README](../../data_processing/README.md) for WAI format details and conversion instructions.
 
 ## Test Processed Data (Optional)
 

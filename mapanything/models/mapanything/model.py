@@ -1372,9 +1372,19 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         scale_head_inputs: torch.Tensor,
         img_shape: Tuple[int, int],
         memory_efficient_inference: bool = False,
+        minibatch_size: int = None,
     ):
         """
         Run Prediction Heads & Post-Process Outputs
+
+        Args:
+            dense_head_inputs: Dense head input features.
+            scale_head_inputs: Scale head input features.
+            img_shape: Image shape (H, W).
+            memory_efficient_inference: Whether to use memory efficient inference.
+            minibatch_size: Optional fixed minibatch size for memory-efficient inference.
+                If provided, uses the specified minibatch size instead of computing it
+                adaptively based on available GPU memory. Defaults to None (adaptive).
         """
         # Get device
         device = self.device
@@ -1392,8 +1402,12 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                     f"Invalid pred_head_type: {self.pred_head_type}. Valid options: ['linear', 'dpt', 'dpt+pose']"
                 )
 
-            # Compute the mini batch size and number of mini batches adaptively based on available memory
-            minibatch = self._compute_adaptive_minibatch_size()
+            # Compute the mini batch size and number of mini batches
+            # Use provided minibatch_size if set, otherwise compute adaptively based on available memory
+            if minibatch_size is not None:
+                minibatch = minibatch_size
+            else:
+                minibatch = self._compute_adaptive_minibatch_size()
             num_batches = (batch_size + minibatch - 1) // minibatch
 
             # Run prediction for each mini-batch
@@ -1503,7 +1517,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
 
         return dense_final_outputs, pose_final_outputs, scale_final_output
 
-    def forward(self, views, memory_efficient_inference=False):
+    def forward(self, views, memory_efficient_inference=False, minibatch_size=None):
         """
         Forward pass performing the following operations:
         1. Encodes the N input views (images).
@@ -1528,6 +1542,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                                     "camera_pose_trans" (tensor): Camera pose translations. Tensor of shape (B, 3). Camera pose is opencv (RDF) cam2world transformation.
                                     "is_metric_scale" (tensor): Boolean tensor indicating whether the geometric inputs are in metric scale or not. Tensor of shape (B, 1).
             memory_efficient_inference (bool): Whether to use memory efficient inference or not. This runs the dense prediction head (the memory bottleneck) in a memory efficient manner. Default is False.
+            minibatch_size (int): Optional fixed minibatch size for memory-efficient inference. If provided, uses the specified minibatch size instead of computing it adaptively based on available GPU memory. Defaults to None (adaptive).
 
         Returns:
             List[dict]: A list containing the final outputs for all N views.
@@ -1565,6 +1580,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             additional_input_tokens_per_view=all_encoder_registers_across_views,
             additional_input_tokens=input_scale_token,
         )
+        final_info_sharing_multi_view_feat = None
+        intermediate_info_sharing_multi_view_feat = None
         if self.info_sharing_return_type == "no_intermediate_features":
             final_info_sharing_multi_view_feat = self.info_sharing(info_sharing_input)
         elif self.info_sharing_return_type == "intermediate_features":
@@ -1645,6 +1662,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                     scale_head_inputs=scale_head_inputs,
                     img_shape=img_shape,
                     memory_efficient_inference=memory_efficient_inference,
+                    minibatch_size=minibatch_size,
                 )
             )
 
@@ -1996,7 +2014,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
     def infer(
         self,
         views: List[Dict[str, Any]],
-        memory_efficient_inference: bool = False,
+        memory_efficient_inference: bool = True,
+        minibatch_size: int = None,
         use_amp: bool = True,
         amp_dtype: str = "bf16",
         apply_mask: bool = True,
@@ -2010,6 +2029,9 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         ignore_pose_inputs: bool = False,
         ignore_depth_scale_inputs: bool = False,
         ignore_pose_scale_inputs: bool = False,
+        use_multiview_confidence: bool = False,
+        multiview_conf_depth_abs_thresh: float = 0.02,
+        multiview_conf_depth_rel_thresh: float = 0.02,
     ) -> List[Dict[str, torch.Tensor]]:
         """
         User-friendly inference with strict input validation and automatic conversion.
@@ -2032,7 +2054,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                 - 'idx': List[int] where length of list is B - index info for each view
                 - 'true_shape': List[tuple] where length of list is B - true shape info (H, W) for each view
 
-            memory_efficient_inference: Whether to use memory-efficient inference for dense prediction heads (trades off speed). Defaults to False.
+            memory_efficient_inference: Whether to use memory-efficient inference for dense prediction heads (trades off speed). Defaults to True.
+            minibatch_size: Optional fixed minibatch size for memory-efficient inference. If provided, skips dynamic computation based on available GPU memory. Defaults to None (adaptive).
             use_amp: Whether to use automatic mixed precision for faster inference. Defaults to True.
             amp_dtype: The dtype to use for mixed precision. Defaults to "bf16" (bfloat16). Options: "fp16", "bf16", "fp32".
             apply_mask: Whether to apply the non-ambiguous mask to the output. Defaults to True.
@@ -2046,6 +2069,13 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             ignore_pose_inputs: Whether to ignore the pose inputs. Defaults to False.
             ignore_depth_scale_inputs: Whether to ignore the depth scale inputs. Defaults to False.
             ignore_pose_scale_inputs: Whether to ignore the pose scale inputs. Defaults to False.
+            use_multiview_confidence: Whether to compute multi-view depth consistency confidence instead of
+                using learning-based confidence. For single-view inference, returns all ones.
+                Note: This adds memory and compute overhead proportional to view count. Defaults to False.
+            multiview_conf_depth_abs_thresh: Absolute depth threshold for multi-view confidence inlier matching.
+                Defaults to 0.02.
+            multiview_conf_depth_rel_thresh: Relative depth threshold for multi-view confidence inlier matching.
+                Defaults to 0.02.
 
         IMPORTANT CONSTRAINTS:
         - Cannot provide both 'intrinsics' and 'ray_directions' (they represent the same information)
@@ -2129,10 +2159,12 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         # Run the model
         with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
             preds = self.forward(
-                processed_views, memory_efficient_inference=memory_efficient_inference
+                processed_views,
+                memory_efficient_inference=memory_efficient_inference,
+                minibatch_size=minibatch_size,
             )
 
-        # Post-process the model outputs
+        # Post-process the model outputs (including multi-view confidence if requested)
         preds = postprocess_model_outputs_for_inference(
             raw_outputs=preds,
             input_views=processed_views,
@@ -2142,6 +2174,9 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
             edge_depth_threshold=edge_depth_threshold,
             apply_confidence_mask=apply_confidence_mask,
             confidence_percentile=confidence_percentile,
+            use_multiview_confidence=use_multiview_confidence,
+            multiview_conf_depth_abs_thresh=multiview_conf_depth_abs_thresh,
+            multiview_conf_depth_rel_thresh=multiview_conf_depth_rel_thresh,
         )
 
         # Restore the original configuration
