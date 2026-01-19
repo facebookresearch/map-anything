@@ -380,8 +380,8 @@ def main():
     )  # Options: --headless, --connect, --serve, --addr, --save, --stdout
     args = parser.parse_args()
 
-    # Get inference device
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Get inference device (auto-detects CUDA > MPS > CPU)
+    device = get_device()
     print(f"Using device: {device}")
 
     # Initialize model from HuggingFace

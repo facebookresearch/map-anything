@@ -18,8 +18,8 @@ from time import time
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import numpy as np
-import torch
 
+from mapanything.utils.device import get_device
 from mapanything.utils.geometry import depthmap_to_world_frame
 from mapanything.utils.hf_utils.hf_helpers import initialize_mapanything_local
 from mapanything.utils.image import load_images
@@ -87,7 +87,7 @@ def main() -> None:
     parser = get_parser()
     args = parser.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
     print(f"Using device: {device}")
 
     print(

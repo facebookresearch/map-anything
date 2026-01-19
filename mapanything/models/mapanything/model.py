@@ -7,13 +7,14 @@
 MapAnything model class defined using UniCeption modules.
 """
 
-import warnings
 from functools import partial
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
+
+from mapanything.utils.device import get_amp_dtype, get_autocast_device_type
 
 from mapanything.utils.geometry import (
     apply_log_to_norm,
@@ -2105,18 +2106,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         """
         # Determine the mixed precision floating point type
         if use_amp:
-            if amp_dtype == "fp16":
-                amp_dtype = torch.float16
-            elif amp_dtype == "bf16":
-                if torch.cuda.is_bf16_supported():
-                    amp_dtype = torch.bfloat16
-                else:
-                    warnings.warn(
-                        "bf16 is not supported on this device. Using fp16 instead."
-                    )
-                    amp_dtype = torch.float16
-            elif amp_dtype == "fp32":
-                amp_dtype = torch.float32
+            amp_dtype = get_amp_dtype(self.device, amp_dtype)
         else:
             amp_dtype = torch.float32
 
@@ -2157,7 +2147,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         )
 
         # Run the model
-        with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
+        device_type = get_autocast_device_type(self.device)
+        with torch.autocast(device_type, enabled=bool(use_amp), dtype=amp_dtype):
             preds = self.forward(
                 processed_views,
                 memory_efficient_inference=memory_efficient_inference,
