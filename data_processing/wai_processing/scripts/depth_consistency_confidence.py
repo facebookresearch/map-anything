@@ -17,18 +17,19 @@ from wai_processing.utils.covis_utils import (
     load_scene_data,
     project_points_to_views,
     sample_depths_at_reprojections,
-)
+    )
 from wai_processing.utils.state import (
     set_processing_state,
-)
+    )
 
+from mapanything.utils.device import get_device
 from mapanything.utils.wai.core import (
     get_frame,
     load_data,
     nest_modality,
     set_frame,
     store_data,
-)
+    )
 from mapanything.utils.wai.scene_frame import get_scene_names
 
 logger = logging.getLogger("covisibility-confidence")
@@ -170,7 +171,8 @@ def compute_covisibility_map(
     Returns:
         None. Results are saved to disk.
     """
-    device = cfg.get("device", "cuda")
+    device_str = cfg.get("device", "cuda")
+    device = get_device(preferred=device_str if device_str != "auto" else None)
 
     # Setup scene data
     scene_root = Path(cfg.root) / scene_name

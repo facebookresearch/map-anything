@@ -40,10 +40,11 @@ from mapanything.utils.image import load_images
 from mapanything.utils.misc import seed_everything
 from mapanything.utils.viz import predictions_to_glb
 
-# Configure CUDA settings
-torch.backends.cudnn.enabled = True
-torch.backends.cudnn.benchmark = True
-torch.backends.cudnn.deterministic = False
+# Configure CUDA settings (only if available)
+if hasattr(torch.backends, "cudnn"):
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = False
 
 
 def parse_args():

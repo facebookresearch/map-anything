@@ -86,3 +86,125 @@ def to_cuda(x):
         Data with the same structure but with tensors moved to GPU
     """
     return to_device(x, "cuda")
+
+
+def get_device(preferred=None):
+    """Auto-detect best available computation device.
+
+    Args:
+        preferred: Optional preferred device type ('cuda', 'mps', 'cpu').
+                  If None, auto-detects in order: CUDA > MPS > CPU.
+
+    Returns:
+        torch.device: The best available device
+    """
+    if preferred is not None:
+        if isinstance(preferred, str):
+            return torch.device(preferred)
+        return preferred
+
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def get_device_capabilities(device):
+    """Query device-specific capabilities.
+
+    Args:
+        device: torch.device to query
+
+    Returns:
+        dict: Device capabilities including:
+            - 'bf16_supported': bool - whether bfloat16 is supported
+            - 'device_type': str - device type for autocast ('cuda', 'mps', 'cpu')
+    """
+    device_type = device.type if hasattr(device, "type") else str(device).split(":")[0]
+
+    capabilities = {
+        "device_type": device_type,
+    }
+
+    if device_type == "cuda":
+        capabilities["bf16_supported"] = torch.cuda.is_bf16_supported()
+    elif device_type == "mps":
+        capabilities["bf16_supported"] = False
+    else:
+        capabilities["bf16_supported"] = False
+
+    return capabilities
+
+
+def is_memory_query_supported(device):
+    """Check if memory query operations are supported for the device.
+
+    Args:
+        device: torch.device to check
+
+    Returns:
+        bool: True if memory operations like mem_get_info() are supported
+    """
+    device_type = device.type if hasattr(device, "type") else str(device).split(":")[0]
+    return device_type == "cuda"
+
+
+def empty_cache(device=None):
+    """Clear GPU cache if backend supports it.
+
+    Args:
+        device: torch.device to clear cache for. If None, uses auto-detected device.
+    """
+    if device is None:
+        device = get_device()
+
+    device_type = device.type if hasattr(device, "type") else str(device).split(":")[0]
+
+    if device_type == "cuda" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def get_amp_dtype(device, requested_dtype="bf16"):
+    """Determine the best available dtype for mixed precision.
+
+    Args:
+        device: torch.device to query
+        requested_dtype: str or torch.dtype - preferred dtype ('bf16', 'fp16', 'fp32')
+
+    Returns:
+        tuple: (dtype_used: torch.dtype, dtype_name: str)
+                dtype_used is the actual torch.dtype that will be used
+                dtype_name is the string representation for logging
+    """
+    if isinstance(requested_dtype, str):
+        requested_dtype = requested_dtype.lower()
+
+    if requested_dtype in ["fp32", "float32"]:
+        return torch.float32, "fp32"
+
+    capabilities = get_device_capabilities(device)
+    if requested_dtype in ["bf16", "bfloat16"]:
+        if capabilities["bf16_supported"]:
+            return torch.bfloat16, "bf16"
+        else:
+            return torch.float16, "fp16"
+
+    if requested_dtype in ["fp16", "float16"]:
+        return torch.float16, "fp16"
+
+    return torch.float32, "fp32"
+
+
+def get_autocast_device_type(device):
+    """Get the device type string for torch.autocast.
+
+    Args:
+        device: torch.device or string
+
+    Returns:
+        str: Device type for autocast ('cuda', 'mps', 'cpu')
+    """
+    if hasattr(device, "type"):
+        return device.type
+    return str(device).split(":")[0]

@@ -7,12 +7,12 @@
 Inference utilities.
 """
 
-import warnings
 from typing import Any, Dict, List
 
 import numpy as np
 import torch
 
+from mapanything.utils.device import get_amp_dtype, get_autocast_device_type
 from mapanything.utils.geometry import (
     depth_edge,
     get_rays_in_camera_frame,
@@ -98,25 +98,15 @@ def loss_of_one_batch_multi_view(
 
     # Determine the mixed precision floating point type
     if use_amp:
-        if amp_dtype == "fp16":
-            amp_dtype = torch.float16
-        elif amp_dtype == "bf16":
-            if torch.cuda.is_bf16_supported():
-                amp_dtype = torch.bfloat16
-            else:
-                warnings.warn(
-                    "bf16 is not supported on this device. Using fp16 instead."
-                )
-                amp_dtype = torch.float16
-        elif amp_dtype == "fp32":
-            amp_dtype = torch.float32
+        amp_dtype = get_amp_dtype(device, amp_dtype)
     else:
         amp_dtype = torch.float32
 
     # Run model and compute loss
-    with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
+    device_type = get_autocast_device_type(device)
+    with torch.autocast(device_type, enabled=bool(use_amp), dtype=amp_dtype):
         preds = model(batch)
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(device_type, enabled=False):
             loss = criterion(batch, preds) if criterion is not None else None
 
     result = {f"view{i + 1}": view for i, view in enumerate(batch)}

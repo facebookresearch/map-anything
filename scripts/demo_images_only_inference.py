@@ -17,9 +17,9 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import numpy as np
 import rerun as rr
-import torch
 
 from mapanything.models import MapAnything
+from mapanything.utils.device import get_device
 from mapanything.utils.geometry import depthmap_to_world_frame
 from mapanything.utils.image import load_images
 from mapanything.utils.viz import (
@@ -146,8 +146,8 @@ def main():
     )  # Options: --headless, --connect, --serve, --addr, --save, --stdout
     args = parser.parse_args()
 
-    # Get inference device
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Get inference device (auto-detects CUDA > MPS > CPU)
+    device = get_device()
     print(f"Using device: {device}")
 
     # Initialize model from HuggingFace
