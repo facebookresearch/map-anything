@@ -26,11 +26,14 @@ class DA3Wrapper(torch.nn.Module):
         name,
         torch_hub_force_reload,
         hf_model_name,
+        geometric_input_config,
+        **kwargs,
     ):
         super().__init__()
         self.name = name
         self.torch_hub_force_reload = torch_hub_force_reload
         self.hf_model_name = hf_model_name
+        self.geometric_input_config = geometric_input_config
 
         # Load pre-trained weights
         if not torch_hub_force_reload:
@@ -71,6 +74,7 @@ class DA3Wrapper(torch.nn.Module):
         """
         # Get input shape of the images, number of views, and batch size per view
         batch_size_per_view, _, height, width = views[0]["img"].shape
+        device = views[0]["img"].device
         num_views = len(views)
 
         # Check the data norm type
@@ -83,9 +87,45 @@ class DA3Wrapper(torch.nn.Module):
         img_list = [view["img"] for view in views]
         images = torch.stack(img_list, dim=1)
 
+        # Decide if we need to use the geometric inputs
+        conditions = {}
+        if torch.rand(1, device=device) < self.geometric_input_config["overall_prob"]:
+            # Decide if we need to use the camera intrinsics
+            if (
+                torch.rand(1, device=device)
+                < self.geometric_input_config["ray_dirs_prob"]
+            ):
+                intrinsics_list = [
+                    view["camera_intrinsics"].to(device) for view in views
+                ]
+                intrinsics = torch.stack(intrinsics_list, dim=1)
+                conditions["intrinsics"] = intrinsics
+
+            # Decide if we need to use the camera poses
+            if torch.rand(1, device=device) < self.geometric_input_config["cam_prob"]:
+                # 1. Get all W2C poses
+                poses_list = [
+                    closed_form_inverse_se3(view["camera_pose"].to(device))
+                    for view in views
+                ]
+                poses = torch.stack(poses_list, dim=1)  # [B, N, 4, 4]
+
+                # 2. Get the first frame's original C2W pose
+                # This is equivalent to your inverse_first_frame_pose
+                first_frame_c2w = views[0]["camera_pose"].to(device).unsqueeze(1)
+
+                # 3. Apply relative transform: W2C_i @ C2W_0
+                poses = poses @ first_frame_c2w
+                conditions["extrinsics"] = poses
+
         # Run the DA3 model
         with torch.autocast("cuda", dtype=self.dtype):
-            results = self.model(images, export_feat_layers=[])
+            results = self.model(
+                image=images,
+                export_feat_layers=[],
+                use_ray_pose=True,
+                **conditions,
+            )
 
         # Need high precision for transformations
         with torch.autocast("cuda", enabled=False):

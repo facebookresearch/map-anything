@@ -34,6 +34,7 @@ for combo in "${batch_sizes_and_views[@]}"; do
         dataset.num_views=$num_views \
         batch_size=$batch_size \
         model=da3_nested \
+        model/task=images_only \
         hydra.run.dir='${root_experiments_dir}/mapanything/benchmarking/dense_'"${num_views}"'_view/da3_nested'
 
     echo "Finished running $dataset with batch_size=$batch_size and num_views=$num_views"

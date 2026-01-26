@@ -2,8 +2,8 @@
 
 # Public Datasets
 
-## Aria Synthetic Environments (ASE)
-Please download the dataset from the official [webpage](https://www.projectaria.com/datasets/ase/#download-dataset).
+## Aria Synthetic Environments (ASE-V2)
+We use an internal version of the ASE dataset (ASE-V2) and it's format/data might not necessarily align with the official public [ASE-V1](https://www.projectaria.com/datasets/ase/#download-dataset). Hence, unfortunately, it might not be possible to reproduce the WAI version of ASE.
 
 ## BlendedMVS
 Use the provided python script `download_bmvs.py`.
@@ -28,6 +28,10 @@ Follow the instructions in the dataset's website to download the zip volumes, th
 Use the provided python script `download_megadepth.py`. MegaDepth also includes all the Tanks & Temples scenes.
 **Source:** [MegaDepth Project](https://www.cs.cornell.edu/projects/megadepth/)
 
+## AerialMegaDepth
+Use the provided python script `download_aerialmegadepth.py`.
+**Source:** [AerialMegaDepth](https://aerial-megadepth.github.io/)
+
 ## MVS-Synth
 Use the provided python script `download_mvs_synth.py`.
 **Source:** [MVS-Synth Dataset](https://phuang17.github.io/DeepMVS/mvs-synth.html)
@@ -49,6 +53,7 @@ Download all the zips from [Spring Benchmark](https://darus.uni-stuttgart.de/dat
 
 ## TartanAirV2 - Wide Baseline (UFM Version)
 Use the provided python script `download_tav2_wb.py`.
+**Source:** [HuggingFace TA-WB-MapAnything](https://huggingface.co/datasets/infinity1096/TA-WB-MapAnything)
 
 ## UnrealStereo4K
 Use the provided python script `download_unrealstereo4k.py`.

@@ -9,6 +9,7 @@ MapAnything Datasets
 
 import torch
 
+from mapanything.datasets.wai.aerialmegadepth import AerialMegaDepthWAI  # noqa
 from mapanything.datasets.wai.ase import ASEWAI  # noqa
 from mapanything.datasets.wai.blendedmvs import BlendedMVSWAI  # noqa
 from mapanything.datasets.wai.dl3dv import DL3DVWAI  # noqa

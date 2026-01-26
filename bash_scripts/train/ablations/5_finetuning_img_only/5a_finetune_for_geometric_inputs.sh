@@ -16,7 +16,7 @@ torchrun --nproc_per_node ${NUM_GPUS} \
     dataset=megatrain_13d_518_many_ar_24ipg_16g dataset.num_workers=12 \
     dataset.num_views=4 \
     loss=overall_loss \
-    model=mapanything \
+    model=mapanything_v1 \
     model/task=aug_training \
     model.encoder.uses_torch_hub=false \
     model.encoder.gradient_checkpointing=true \

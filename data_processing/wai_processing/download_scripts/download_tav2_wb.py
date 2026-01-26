@@ -9,16 +9,13 @@ Extract the images, depth, poses and calibration corresponding to the different 
 """
 
 import argparse
-import concurrent.futures
 import logging
 import os
 import re
 
 import numpy as np
 import pandas as pd
-import urllib3
-from minio import Minio
-from minio.error import S3Error
+from huggingface_hub import snapshot_download
 from PIL import Image
 from tqdm import tqdm
 from wai_processing.utils.distributed_h5 import (
@@ -29,45 +26,12 @@ from wai_processing.utils.parallel import parallel_threads
 from mapanything.utils.wai.core import store_data
 
 
-def download_file(client, bucket_name, obj, destination_folder):
-    "Download a file from MinIO server"
-    object_name = os.path.basename(obj.object_name)
-    destination_file = os.path.join(destination_folder, object_name)
-    if not os.path.exists(destination_file):
-        os.makedirs(os.path.dirname(destination_file), exist_ok=True)
-        try:
-            client.fget_object(bucket_name, obj.object_name, destination_file)
-            logging.info(f"Download successful: {object_name}")
-        except S3Error as e:
-            logging.error(f"Error downloading {object_name}: {e}")
-            return
-    else:
-        logging.info(f"File {destination_file} already exists. Skipping...")
-
-
-def download_folder(folder_name, bucket_name, client, destination_folder, num_workers):
-    "Download a folder from MinIO server"
-    objects = list(client.list_objects(bucket_name, prefix=folder_name, recursive=True))
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = [
-            executor.submit(download_file, client, bucket_name, obj, destination_folder)
-            for obj in objects
-        ]
-        for future in tqdm(
-            concurrent.futures.as_completed(futures),
-            total=len(futures),
-            desc=f"Downloading {folder_name}",
-        ):
-            future.result()
-
-
 def download_tav2_wb(args, num_workers):
-    """Download the TAv2 wide baseline dataset.
+    """Download the TAv2 wide baseline dataset from Hugging Face.
 
     Args:
         args: Parsed command line arguments
-        num_workers: Number of workers for parallel download
+        num_workers: Number of workers for parallel download (unused, kept for API compatibility)
     """
     # Set up logging
     logging.basicConfig(
@@ -76,64 +40,34 @@ def download_tav2_wb(args, num_workers):
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
-    # Define download client
-    access_key = "jH8UFqt4oli1lmGabHeT"
-    secret_key = "SU5aUyahsXB7AlgbSEYNeshm8GL2P5iKatd6iRrt"
-    http_client = urllib3.PoolManager(
-        cert_reqs="CERT_NONE",  # Disable SSL certificate verification
-        maxsize=20,
-    )
-    urllib3.disable_warnings(
-        urllib3.exceptions.InsecureRequestWarning
-    )  # Disable SSL warnings
-    client = Minio(
-        "128.237.74.10:9000",
-        access_key=access_key,
-        secret_key=secret_key,
-        secure=True,
-        http_client=http_client,
-    )
-    bucket_name = "tav2"
+    # Hugging Face repo ID
+    repo_id = "infinity1096/TA-WB-MapAnything"
 
     # Define the target download directory
     target_dir = os.path.join(args.root_dir, "tav2_wb_h5")
     os.makedirs(target_dir, exist_ok=True)
 
-    # Define mapping of folders that need to be downloaded
-    download_mapping = [
-        (
-            "TartanAir/assembled/tartanair_640_mega_training_0203_pinhole_good/train_camera_data/",
-            os.path.join(target_dir, "train_camera_data"),
-        ),
-        (
-            "TartanAir/assembled/tartanair_640_mega_training_0203_pinhole_good/validation_camera_data/",
-            os.path.join(target_dir, "val_camera_data"),
-        ),
-        (
-            "TartanAir/assembled/tartanair_640_pinhole_test_good_imgdep/train_camera_data/",
-            os.path.join(target_dir, "test_camera_data"),
-        ),
-        (
-            "TartanAir/assembled/tartanair_640_mega_training_0203_pinhole_good/validation/",
-            os.path.join(target_dir, "val"),
-        ),
-        (
-            "TartanAir/assembled/tartanair_640_pinhole_test_good_imgdep/train/",
-            os.path.join(target_dir, "test"),
-        ),
-        (
-            "TartanAir/assembled/tartanair_640_mega_training_0203_pinhole_good/train/",
-            os.path.join(target_dir, "train"),
-        ),
+    # Define folders to download one by one
+    folders_to_download = [
+        "train_camera_data",
+        "val_camera_data",
+        "test_camera_data",
+        "val",
+        "test",
+        "train",
     ]
 
-    # Loop over the folders and download them
-    for curr_download_mapping in tqdm(download_mapping):
-        source_folder_name, destination_folder = curr_download_mapping
-        os.makedirs(destination_folder, exist_ok=True)
-        download_folder(
-            source_folder_name, bucket_name, client, destination_folder, num_workers
+    # Download each folder individually
+    for folder in tqdm(folders_to_download, desc="Downloading folders"):
+        logging.info(f"Downloading folder: {folder}")
+        print(f"Downloading {folder}...")
+        snapshot_download(
+            repo_id=repo_id,
+            repo_type="dataset",
+            local_dir=target_dir,
+            allow_patterns=f"{folder}/*",
         )
+        logging.info(f"Completed downloading folder: {folder}")
 
 
 def strip_terms_from_string(input_string, terms):

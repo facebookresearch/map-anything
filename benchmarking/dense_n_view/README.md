@@ -7,7 +7,21 @@ The benchmark enables testing at varying number of views where the sampled views
 
 ## Prepare Evaluation Data
 
-Before running the benchmark, process the test datasets to WAI format. See [Data Processing README](../../data_processing/README.md) for WAI format details and conversion instructions.
+### Option 1: Download Pre-processed Data (Recommended)
+
+Download and extract the pre-processed WAI format benchmarking data directly from HuggingFace:
+
+```bash
+python data_processing/download_and_extract_benchmarking_data.py \
+    --download --extract \
+    --output_dir "<your_data_dir>/map-anything-benchmarking-dataset"
+```
+
+The downloaded data includes test splits for ETH3D, ScanNet++V2, and TartanAirV2-WB in WAI format. Run with `--help` for additional options.
+
+### Option 2: Process Data Yourself
+
+Alternatively, process the test datasets to WAI format manually. See [Data Processing README](../../data_processing/README.md) for WAI format details and conversion instructions.
 
 ## Test Processed Data (Optional)
 

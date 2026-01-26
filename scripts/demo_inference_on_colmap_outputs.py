@@ -32,6 +32,7 @@ from PIL import Image
 
 from mapanything.models import MapAnything
 from mapanything.utils.colmap import get_camera_matrix, qvec2rotmat, read_model
+from mapanything.utils.colmap_export import export_predictions_to_colmap
 from mapanything.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
 from mapanything.utils.image import preprocess_inputs
 from mapanything.utils.viz import predictions_to_glb, script_add_rerun_args
@@ -54,12 +55,14 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
 
     Args:
         colmap_path (str): Path to the main folder containing images/ and sparse/ subfolders
-        stride (int): Load every nth image (default: 50)
+        stride (int): Load every nth image (default: 1)
         verbose (bool): Print progress messages
         ext (str): COLMAP file extension (".bin" or ".txt")
 
     Returns:
-        list: List of view dictionaries for MapAnything inference
+        tuple: (views_list, image_names_list)
+            - views_list: List of view dictionaries for MapAnything inference
+            - image_names_list: List of image file names in order
     """
     # Define paths
     images_folder = os.path.join(colmap_path, "images")
@@ -98,6 +101,7 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
         raise ValueError(f"No image files found in {images_folder}")
 
     views_example = []
+    image_names_list = []  # Track image names in order
     processed_count = 0
 
     # Get a list of all colmap image names
@@ -165,6 +169,7 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
             }
 
             views_example.append(view)
+            image_names_list.append(img_name)
             processed_count += 1
 
             if verbose:
@@ -204,6 +209,7 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
             }
 
             views_example.append(view)
+            image_names_list.append(img_name)
             processed_count += 1
 
             if verbose:
@@ -223,7 +229,7 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
     if verbose:
         print(f"Successfully loaded {len(views_example)} views with stride={stride}")
 
-    return views_example
+    return views_example, image_names_list
 
 
 def log_data_to_rerun(
@@ -292,12 +298,6 @@ def get_parser():
         help="COLMAP file extension (default: .bin)",
     )
     parser.add_argument(
-        "--memory_efficient_inference",
-        action="store_true",
-        default=False,
-        help="Use memory efficient inference for reconstruction (trades off speed)",
-    )
-    parser.add_argument(
         "--apache",
         action="store_true",
         help="Use Apache 2.0 licensed model (facebook/map-anything-apache)",
@@ -327,10 +327,10 @@ def get_parser():
         help="Output directory for GLB file and input images",
     )
     parser.add_argument(
-        "--save_input_images",
+        "--save_input_images_when_saving_glb",
         action="store_true",
         default=False,
-        help="Save input images alongside GLB output (requires --save_glb)",
+        help="Save input images alongside GLB output when saving GLB",
     )
     parser.add_argument(
         "--ignore_calibration_inputs",
@@ -343,6 +343,30 @@ def get_parser():
         action="store_true",
         default=False,
         help="Ignore COLMAP pose inputs (use only images and calibration)",
+    )
+    parser.add_argument(
+        "--save_colmap",
+        action="store_true",
+        default=False,
+        help="Save outputs in COLMAP format",
+    )
+    parser.add_argument(
+        "--voxel_fraction",
+        type=float,
+        default=0.01,
+        help="Fraction of IQR-based scene extent for voxel downsampling (default: 0.01 = 1%%)",
+    )
+    parser.add_argument(
+        "--voxel_size",
+        type=float,
+        default=None,
+        help="Explicit voxel size in meters (overrides --voxel_fraction)",
+    )
+    parser.add_argument(
+        "--skip_point2d",
+        action="store_true",
+        default=False,
+        help="Skip Point2D backprojection for faster COLMAP export",
     )
 
     return parser
@@ -371,7 +395,7 @@ def main():
 
     # Load COLMAP data
     print(f"Loading COLMAP data from: {args.colmap_path}")
-    views_example = load_colmap_data(
+    views_example, image_names = load_colmap_data(
         args.colmap_path,
         stride=args.stride,
         verbose=args.verbose,
@@ -383,11 +407,12 @@ def main():
     print("Preprocessing COLMAP inputs...")
     processed_views = preprocess_inputs(views_example, verbose=False)
 
-    # Run model inference
+    # Run model inference with memory-efficient defaults
     print("Running MapAnything inference on COLMAP data...")
     outputs = model.infer(
         processed_views,
-        memory_efficient_inference=args.memory_efficient_inference,
+        memory_efficient_inference=True,
+        minibatch_size=1,
         # Control which COLMAP inputs to use/ignore
         ignore_calibration_inputs=args.ignore_calibration_inputs,  # Whether to use COLMAP calibration or not
         ignore_depth_inputs=True,  # COLMAP doesn't provide depth (can recover from sparse points but convoluted)
@@ -457,6 +482,25 @@ def main():
     if args.viz:
         print("Visualization complete! Check the Rerun viewer.")
 
+    # Export to COLMAP format if requested
+    if args.save_colmap:
+        print("Exporting to COLMAP format...")
+        colmap_output_dir = args.output_directory
+        os.makedirs(colmap_output_dir, exist_ok=True)
+
+        _ = export_predictions_to_colmap(
+            outputs=outputs,
+            processed_views=processed_views,
+            image_names=image_names,
+            output_dir=colmap_output_dir,
+            voxel_fraction=args.voxel_fraction,
+            voxel_size=args.voxel_size,
+            data_norm_type=model.encoder.data_norm_type,
+            save_ply=True,
+            skip_point2d=args.skip_point2d,
+        )
+        print(f"COLMAP reconstruction saved to: {colmap_output_dir}/sparse/")
+
     # Export GLB if requested
     if args.save_glb:
         # Create output directory structure
@@ -470,7 +514,7 @@ def main():
         print(f"Saving GLB file to: {glb_output_path}")
 
         # Save processed input images if requested
-        if args.save_input_images:
+        if args.save_input_images_when_saving_glb:
             # Create processed images directory
             processed_images_dir = os.path.join(
                 scene_output_dir, f"{scene_prefix}_input_images"
@@ -513,10 +557,6 @@ def main():
         scene_3d.export(glb_output_path)
         print(f"Successfully saved GLB file: {glb_output_path}")
         print(f"All outputs saved to: {scene_output_dir}")
-    else:
-        print("Skipping GLB export (--save_glb not specified)")
-        if args.save_input_images:
-            print("Warning: --save_input_images has no effect without --save_glb")
 
 
 if __name__ == "__main__":

@@ -39,6 +39,11 @@ keep_freq: 10
 print_freq: 20
 # Resume Training from last checkpoint
 resume: False
+# Check for loss instability (stop training if loss exceeds max_loss_value)
+check_loss_instability: True
+# Maximum loss value threshold for detecting training instability
+max_loss_value: 1000
+
 # JEPA training mode
 jepa: false
 # EMA target model parameters update settings

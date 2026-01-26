@@ -1,0 +1,43 @@
+defaults:
+  - default
+
+# Configuration for fine-tuning only the dense head and pose head
+# Freezes: encoder, all geometric encoders, info_sharing (multi-view transformer)
+# Trains: dense_head, pose_head, scale_head, and their adaptors
+
+# Use very low lr for finetuning
+lr: 5e-06
+min_lr: 5e-08
+
+# Optimizer parameters specific to submodules
+submodule_configs:
+  # Image Encoder
+  encoder:
+    lr: 0
+  # Ray Directions Encoder
+  ray_dirs_encoder:
+    lr: 0
+  # Depth Encoder
+  depth_encoder:
+    lr: 0
+  # Depth Scale Encoder
+  depth_scale_encoder:
+    lr: 0
+  # Camera Rotation Encoder
+  cam_rot_encoder:
+    lr: 0
+  # Camera Translation Encoder
+  cam_trans_encoder:
+    lr: 0
+  # Camera Translation Scale Encoder
+  cam_trans_scale_encoder:
+    lr: 0
+  # Fusion Norm Layer
+  fusion_norm_layer:
+    lr: 0
+  # Scale Token
+  scale_token:
+    lr: 0
+  # Multi-View Attention Transformer (Info Sharing)
+  info_sharing:
+    lr: 0

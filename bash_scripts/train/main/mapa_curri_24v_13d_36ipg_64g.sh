@@ -51,4 +51,4 @@ torchrun --nproc_per_node ${NUM_GPUS} --nnodes ${NUM_NODES} --node_rank ${NODE_R
     train_params.warmup_epochs=6 \
     train_params.keep_freq=10 \
     train_params.max_num_of_imgs_per_gpu=36 \
-    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_36ipg_64g'
+    hydra.run.dir='${root_experiments_dir}/mapanything/training/mapa_v1_1'

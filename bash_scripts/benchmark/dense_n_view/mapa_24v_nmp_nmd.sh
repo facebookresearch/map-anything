@@ -36,7 +36,7 @@ for combo in "${batch_sizes_and_views[@]}"; do
         model=mapanything \
         model/task=non_metric_poses_non_metric_depth \
         model.encoder.uses_torch_hub=false \
-        model.pretrained='${root_experiments_dir}/mapanything/training/mapa_curri_24v_13d_36ipg_64g/checkpoint-last.pth' \
+        model.pretrained='${root_experiments_dir}/mapanything/training/mapa_v1_1/checkpoint-last.pth' \
         hydra.run.dir='${root_experiments_dir}/mapanything/benchmarking/dense_'"${num_views}"'_view/mapa_24v_nmp_nmd'
 
     echo "Finished running $dataset with batch_size=$batch_size and num_views=$num_views"

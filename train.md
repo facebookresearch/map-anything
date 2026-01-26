@@ -42,9 +42,13 @@ bash bash_scripts/train/main/mapa_curri_4v_13d_36ipg_64g.sh 8
 # Stage 2: 24-view training - 8 Nodes
 bash bash_scripts/train/main/mapa_curri_24v_13d_36ipg_64g.sh 8
 
+# Stage 3: 24-view confidence training - 8 Nodes
+bash bash_scripts/train/main/mapa_v1_1.sh 8
+
 # Likewise for Apache 2.0 licensed variants - 8 Nodes
 bash bash_scripts/train/main/mapa_curri_4v_6d_36ipg_64g_apache.sh 8
 bash bash_scripts/train/main/mapa_curri_24v_6d_36ipg_64g_apache.sh 8
+bash bash_scripts/train/main/mapa_v1_1_apache.sh 8
 ```
 
 Update the machine configuration in `configs/machine/your_machine.yaml` and adjust paths in the bash scripts before execution.

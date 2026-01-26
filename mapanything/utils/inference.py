@@ -23,6 +23,7 @@ from mapanything.utils.geometry import (
     rotation_matrix_to_quaternion,
 )
 from mapanything.utils.image import rgb
+from mapanything.utils.multiview_confidence import compute_multiview_depth_confidence
 
 # Hard constraints - exactly what users can provide
 ALLOWED_VIEW_KEYS = {
@@ -300,6 +301,9 @@ def postprocess_model_outputs_for_inference(
     edge_depth_threshold: float = 0.03,
     apply_confidence_mask: bool = False,
     confidence_percentile: float = 10,
+    use_multiview_confidence: bool = False,
+    multiview_conf_depth_abs_thresh: float = 0.02,
+    multiview_conf_depth_rel_thresh: float = 0.02,
 ) -> List[Dict[str, torch.Tensor]]:
     """
     Post-process raw model outputs by copying raw outputs and adding essential derived fields.
@@ -310,7 +314,8 @@ def postprocess_model_outputs_for_inference(
     3. Adding Z depth (depth_z) from camera frame points
     4. Recovering pinhole camera intrinsics from ray directions
     5. Adding camera pose matrices (camera_poses) if pose data is available
-    6. Applying mask to dense geometry outputs if requested (supports edge masking and confidence masking)
+    6. Computing multi-view depth consistency confidence if requested
+    7. Applying mask to dense geometry outputs if requested (supports edge masking and confidence masking)
 
     Args:
         raw_outputs: List of raw model output dictionaries, one per view
@@ -319,6 +324,10 @@ def postprocess_model_outputs_for_inference(
         mask_edges: Whether to compute an edge mask based on normals and depth and apply it to the output. Defaults to True.
         apply_confidence_mask: Whether to apply the confidence mask to the output. Defaults to False.
         confidence_percentile: The percentile to use for the confidence threshold. Defaults to 10.
+        use_multiview_confidence: Whether to compute multi-view depth consistency confidence
+            instead of using the learning-based confidence. Defaults to False.
+        multiview_conf_depth_abs_thresh: Absolute depth threshold for multi-view inlier matching. Defaults to 0.02.
+        multiview_conf_depth_rel_thresh: Relative depth threshold for multi-view inlier matching. Defaults to 0.02.
 
     Returns:
         List of processed output dictionaries containing:
@@ -327,14 +336,14 @@ def postprocess_model_outputs_for_inference(
             - 'depth_z': Z depth from camera frame (B, H, W, 1) if points in camera frame available
             - 'intrinsics': Recovered pinhole camera intrinsics (B, 3, 3) if ray directions available
             - 'camera_poses': 4x4 pose matrices (B, 4, 4) if pose data available
-            - 'mask': comprehensive mask for dense geometry outputs (B, H, W, 1) if requested
+            - 'conf': Confidence values (B, H, W) - either learning-based or multi-view consistency
+            - 'mask': Comprehensive mask for dense geometry outputs (B, H, W, 1) if requested
 
     """
     processed_outputs = []
 
-    for view_idx, (raw_output, original_view) in enumerate(
-        zip(raw_outputs, input_views)
-    ):
+    # First loop: Compute derived fields (steps 1-4) for all views
+    for raw_output, original_view in zip(raw_outputs, input_views):
         # Start by copying all raw outputs
         processed_output = dict(raw_output)
 
@@ -378,7 +387,37 @@ def postprocess_model_outputs_for_inference(
 
             processed_output["camera_poses"] = pose_matrices  # (B, 4, 4)
 
-        # 5. Apply comprehensive mask to dense geometry outputs if requested
+        processed_outputs.append(processed_output)
+
+    # 5. Compute multi-view depth consistency confidence if requested
+    num_views = len(processed_outputs)
+    if use_multiview_confidence and num_views > 1:
+        # Gather required data from all views
+        depth_z_list = [p["depth_z"] for p in processed_outputs]
+        intrinsics_list = [p["intrinsics"] for p in processed_outputs]
+        camera_poses_list = [p["camera_poses"] for p in processed_outputs]
+        depth_masks_list = [p["non_ambiguous_mask"] for p in processed_outputs]
+
+        # Compute multi-view confidence
+        mv_conf_list = compute_multiview_depth_confidence(
+            depth_z=depth_z_list,
+            intrinsics=intrinsics_list,
+            camera_poses=camera_poses_list,
+            depth_assoc_abs_thresh=multiview_conf_depth_abs_thresh,
+            depth_assoc_rel_thresh=multiview_conf_depth_rel_thresh,
+            depth_masks=depth_masks_list,
+        )
+
+        # Replace confidence in each view
+        for i, processed_output in enumerate(processed_outputs):
+            processed_output["conf"] = mv_conf_list[i]
+    elif use_multiview_confidence and num_views == 1:
+        # Single view: return all ones
+        processed_outputs[0]["conf"] = torch.ones_like(processed_outputs[0]["conf"])
+
+    # Second loop: Apply masking (step 6) using the (possibly replaced) confidence
+    for processed_output in processed_outputs:
+        # 6. Apply comprehensive mask to dense geometry outputs if requested
         if apply_mask:
             final_mask = None
 
@@ -474,7 +513,5 @@ def postprocess_model_outputs_for_inference(
 
                 # Add mask to processed output
                 processed_output["mask"] = final_mask_torch
-
-        processed_outputs.append(processed_output)
 
     return processed_outputs
