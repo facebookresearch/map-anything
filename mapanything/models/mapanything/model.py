@@ -622,7 +622,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                     f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} ..."
                 )
                 ckpt = torch.load(self.pretrained_checkpoint_path, weights_only=False)
-                print(self.load_state_dict(ckpt["model"]))
+                print(self.load_state_dict(ckpt["model"], strict=False))
             else:
                 print(
                     f"Loading pretrained MapAnything weights from {self.pretrained_checkpoint_path} for specific submodules: {self.specific_pretrained_submodules} ..."

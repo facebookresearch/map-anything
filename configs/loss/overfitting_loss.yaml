@@ -1,0 +1,4 @@
+# Training Loss
+train_criterion: "OverfittingLoss()"
+# Validation Loss
+test_criterion: "OverfittingLoss()"

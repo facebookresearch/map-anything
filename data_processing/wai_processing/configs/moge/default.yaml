@@ -1,10 +1,10 @@
 root: # needs to be set via argument: root=<wai_dataset_root_path>
 
-model_path: /ai4rl/fsx/xrtech/checkpoints/MoGe/moge-2-vitl-normal/model.pt
+model_path: /comp_robot/yinrui/huggingface/hub/moge-2-vitl-normal/model.pt
 model_name: moge2
 out_path: moge/v0
 device: cuda
-random_scene_processing_order: true
+random_scene_processing_order: false
 
 scene_filters:
   - exists: images

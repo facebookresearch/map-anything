@@ -1085,9 +1085,7 @@ def load_example_scene(scene_name, examples_dir="examples"):
 # -------------------------------------------------------------------------
 # 6) Build Gradio UI
 # -------------------------------------------------------------------------
-theme = get_gradio_theme()
-
-with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
+with gr.Blocks() as demo:
     # State variables for the tabbed interface
     is_example = gr.Textbox(label="is_example", visible=False, value="None")
     num_images = gr.Textbox(label="num_images", visible=False, value="None")
@@ -1098,7 +1096,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     gr.HTML(get_header_html(get_logo_base64()))
     gr.HTML(get_description_html())
 
-    target_dir_output = gr.Textbox(label="Target Dir", visible=False, value="None")
+    target_dir_output = gr.Textbox(label="Target Dir", visible=True, value="None")
 
     with gr.Row():
         with gr.Column(scale=2):
@@ -1120,7 +1118,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                 label="Preview",
                 columns=4,
                 height="300px",
-                show_download_button=True,
+                # show_download_button=True,
                 object_fit="contain",
                 preview=True,
             )
@@ -1582,4 +1580,5 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     # -------------------------------------------------------------------------
     gr.HTML(get_acknowledgements_html())
 
-    demo.queue(max_size=20).launch(show_error=True, share=True, ssr_mode=False)
+    theme = get_gradio_theme()
+    demo.queue(max_size=20).launch(server_name="0.0.0.0", show_error=True, ssr_mode=False, theme=theme, css=GRADIO_CSS)

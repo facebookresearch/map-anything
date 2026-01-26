@@ -1,0 +1,24 @@
+defaults:
+  - default
+  - encoder: dinov2_giant_24_layers
+  - info_sharing: aat_adapter_ifr_16_layers_vitg
+  - pred_head: dpt_pose_scale
+  - predicter: aat_6_layers_384_dim
+  - task: images_only
+
+# String for model factory
+model_str: "mapanything_adapter"
+# Model config
+model_config:
+  name: "mapanything_adapter"
+  encoder_config: ${model.encoder}
+  info_sharing_config: ${model.info_sharing}
+  pred_head_config: ${model.pred_head}
+  predicter_config: ${model.predicter}
+  geometric_input_config: ${model.task}
+  use_register_tokens_from_encoder: True
+  info_sharing_mlp_layer_str: "swiglufused"
+  intermediates_only: True
+  pretrained_checkpoint_path: '${machine.root_pretrained_checkpoints_dir}/mapanything.pth'
+# Image Normalization Type
+data_norm_type: ${model.encoder.data_norm_type}

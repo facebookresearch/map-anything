@@ -1,0 +1,21 @@
+# Module arguments
+module_args:
+  # Name of the info sharing module
+  name: "aat_6_layers_384_dim"
+  # Size string
+  size: "6_layers"
+  # Depth (this includes both frame-wise and gloabl attention layers)
+  depth: 6
+  # Distinguish Reference and Non-Reference Views
+  distinguish_ref_and_non_ref_views: True
+  # Flag to indicate whether to use gradient checkpointing
+  gradient_checkpointing: False
+  # Feature dim (similar to ViT-Giant)
+  dim: 1536
+  # Number of heads (similar to ViT-Giant)
+  num_heads: 24
+  # Set transformer parameters similar to DINOv2
+  mlp_ratio: 4
+  qkv_bias: True
+  qk_norm: False
+  init_values: 1e-5

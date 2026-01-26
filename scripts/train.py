@@ -20,6 +20,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from mapanything.train.training import train
+from mapanything.train.training_jepa import train_jepa
 from mapanything.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
@@ -41,7 +42,10 @@ def execute_training(cfg: DictConfig):
     sys.stderr = StreamToLogger(log, logging.ERROR)
 
     # Run the training
-    train(cfg)
+    if not cfg.train_params.jepa:
+        train(cfg)
+    else:
+        train_jepa(cfg)
 
 
 if __name__ == "__main__":

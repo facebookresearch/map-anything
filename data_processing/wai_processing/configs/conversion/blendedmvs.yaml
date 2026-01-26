@@ -1,5 +1,5 @@
-original_root: # path of raw downloaded dataset
-root: # path of wai-formatted dataset
+original_root: /comp_robot/cv_public_dataset/blendedmvs/blendedmvs
+root: /comp_robot/cv_public_dataset/blendedmvs/wai
 
 dataset_name: blendedmvs
 version: 0.1

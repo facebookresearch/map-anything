@@ -174,3 +174,9 @@ cython_debug/
 
 # VSCode
 .vscode
+
+# Custom
+data/
+slurm/out/
+input_images*/
+exp/

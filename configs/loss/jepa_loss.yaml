@@ -1,0 +1,4 @@
+# Training Loss
+train_criterion: "L2Loss()"
+# Validation Loss
+test_criterion: "L2Loss()"

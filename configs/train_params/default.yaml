@@ -38,4 +38,9 @@ keep_freq: 10
 # Frequence (number of iterations) to print infos while training (includes tensorboard logging)
 print_freq: 20
 # Resume Training from last checkpoint
-resume: True
+resume: False
+# JEPA training mode
+jepa: false
+# EMA target model parameters update settings
+target_ema: [0.996, 1.0]
+ema_ipe_scale: 1.0

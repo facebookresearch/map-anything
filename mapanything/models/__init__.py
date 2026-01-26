@@ -20,6 +20,8 @@ from mapanything.models.mapanything import (
     MapAnythingAblations,
     ModularDUSt3R,
 )
+from mapanything.models.mapanything_adapter.model_adapter import MapAnythingAdapter
+
 
 # Suppress DINOv2 warnings
 logging.getLogger("dinov2").setLevel(logging.WARNING)
@@ -70,6 +72,10 @@ MODEL_CONFIGS = {
     },
     "modular_dust3r": {
         "class": ModularDUSt3R,
+    },
+    # Adapters
+    "mapanything_adapter": {
+        "class": MapAnythingAdapter,
     },
     # External models
     "anycalib": {
