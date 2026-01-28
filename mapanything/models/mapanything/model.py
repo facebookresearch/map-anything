@@ -7,6 +7,7 @@
 MapAnything model class defined using UniCeption modules.
 """
 
+import importlib
 import warnings
 from functools import partial
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
@@ -163,7 +164,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         # Create a copy of the config before deleting the key to preserve it for serialization
         encoder_config_copy = self.encoder_config.copy()
         del encoder_config_copy["uses_torch_hub"]
-        self.encoder = encoder_factory(**encoder_config_copy)
+        self.encoder = self._initialize_image_encoder(encoder_config_copy)
 
         # Initialize the encoder for ray directions
         ray_dirs_encoder_config = self.geometric_input_config["ray_dirs_encoder_config"]
@@ -239,6 +240,19 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
     @property
     def dtype(self) -> torch.dtype:
         return next(self.parameters()).dtype
+
+    def _initialize_image_encoder(self, encoder_config):
+        """Initialize image encoder using importlib if module/class_name provided, else use uniception."""
+        if "module" in encoder_config and "class_name" in encoder_config:
+            module = importlib.import_module(encoder_config["module"])
+            encoder_class = getattr(module, encoder_config["class_name"])
+            config_copy = {
+                k: v
+                for k, v in encoder_config.items()
+                if k not in ("module", "class_name")
+            }
+            return encoder_class(**config_copy)
+        return encoder_factory(**encoder_config)
 
     def _initialize_info_sharing(self, info_sharing_config):
         """

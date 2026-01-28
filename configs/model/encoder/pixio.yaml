@@ -1,0 +1,10 @@
+# External encoder module
+module: "mapanything.models.external.pixio.pixio"
+# Class name
+class_name: "PixioEncoder"
+# huggingface model name
+hf_model_name: "facebook/pixio-vith16"
+# Flag to indicate whether to use gradient checkpointing for encoder
+gradient_checkpointing: True
+# Flag to indicate whether model class uses torch hub
+uses_torch_hub: False

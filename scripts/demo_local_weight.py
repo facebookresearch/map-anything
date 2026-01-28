@@ -97,7 +97,14 @@ def main() -> None:
     print("Successfully loaded pretrained weights")
 
     print(f"Loading images from: {args.image_folder}")
-    views = load_images(args.image_folder)
+    if "patch_size" in args.local_config and "resolution" in args.local_config:
+        views = load_images(
+            args.image_folder,
+            patch_size=args.local_config["patch_size"],
+            resolution_set=args.local_config["resolution"],
+        )
+    else:
+        views = load_images(args.image_folder)
     if len(views) == 0:
         raise ValueError(f"No images found in {args.image_folder}")
     print(f"Loaded {len(views)} views")
