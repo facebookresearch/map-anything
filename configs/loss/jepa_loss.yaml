@@ -1,4 +1,5 @@
 # Training Loss
-train_criterion: "L2Loss()"
+train_criterion: "JEPALoss()"
 # Validation Loss
-test_criterion: "L2Loss()"
+test_criterion: "JEPALoss()"
+

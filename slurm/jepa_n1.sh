@@ -17,6 +17,8 @@ export NO_ALBUMENTATIONS_UPDATE=1
 export TRITON_CACHE_DIR=/comp_robot/${USER}/tmp
 export PYTHONWARNINGS=ignore::FutureWarning,ignore::UserWarning
 
+export HYDRA_FULL_ERROR=1
+
 set -x
 
 # cd /home/${USER}/workspace_dgx/map-anything/mapanything/ops
@@ -24,5 +26,8 @@ set -x
 # python test.py
 
 cd /home/${USER}/workspace_dgx/map-anything/
-bash bash_scripts/train/jepa/mapa_curri_4v_bmvs_4ipg_18g_jepa.sh \
+# bash bash_scripts/train/jepa/mapa_curri_4v_bmvs_4ipg_18g_jepa.sh \
+#     8 $SLURM_NNODES $SLURM_NODEID $SLURM_JOBID localhost 1
+
+bash bash_scripts/train/jepa/probe.sh \
     8 $SLURM_NNODES $SLURM_NODEID $SLURM_JOBID localhost 1

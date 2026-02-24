@@ -1,0 +1,26 @@
+dataset_str:
+  "ScanNetWAI(
+    split='${dataset.scannet_wai.train.split}',
+    resolution=${dataset.scannet_wai.train.dataset_resolution},
+    principal_point_centered=${dataset.scannet_wai.train.principal_point_centered},
+    aug_crop=${dataset.scannet_wai.train.aug_crop},
+    transform='${dataset.scannet_wai.train.transform}',
+    data_norm_type='${dataset.scannet_wai.train.data_norm_type}',
+    ROOT='${dataset.scannet_wai.train.ROOT}',
+    dataset_metadata_dir='${dataset.scannet_wai.train.dataset_metadata_dir}',
+    overfit_num_sets=${dataset.scannet_wai.train.overfit_num_sets},
+    variable_num_views=${dataset.scannet_wai.train.variable_num_views},
+    num_views=${dataset.scannet_wai.train.num_views},
+    covisibility_thres=${dataset.scannet_wai.train.covisibility_thres})"
+split: 'train'
+dataset_resolution: ${dataset.resolution_train}
+principal_point_centered: ${dataset.principal_point_centered}
+aug_crop: 16
+transform: 'colorjitter+grayscale+gaublur'
+data_norm_type: ${model.data_norm_type}
+ROOT: ${root_data_dir}/scannetv2
+dataset_metadata_dir: ${mapanything_dataset_metadata_dir}
+overfit_num_sets: null
+variable_num_views: ${dataset.train.variable_num_views}
+num_views: ${dataset.num_views}
+covisibility_thres: 0.25

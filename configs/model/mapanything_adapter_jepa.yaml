@@ -3,8 +3,9 @@ defaults:
   - encoder: dinov2_giant_24_layers
   - info_sharing: aat_adapter_ifr_16_layers_vitg
   - pred_head: dpt_pose_scale
-  - predicter: aat_6_layers_384_dim
-  - task: images_only
+  - predicter: aat_6_layers_512_dim
+  - probe: linear_probe_20_cls
+  - task: aug_training_jepa
 
 # String for model factory
 model_str: "mapanything_adapter"
@@ -15,6 +16,7 @@ model_config:
   info_sharing_config: ${model.info_sharing}
   pred_head_config: ${model.pred_head}
   predicter_config: ${model.predicter}
+  probe_config: ${model.probe}
   geometric_input_config: ${model.task}
   use_register_tokens_from_encoder: True
   info_sharing_mlp_layer_str: "swiglufused"

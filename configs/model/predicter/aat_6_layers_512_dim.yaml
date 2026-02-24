@@ -1,7 +1,7 @@
 # Module arguments
 module_args:
   # Name of the info sharing module
-  name: "aat_6_layers_384_dim"
+  name: "aat_6_layers_512_dim"
   # Size string
   size: "6_layers"
   # Depth (this includes both frame-wise and gloabl attention layers)
@@ -11,9 +11,9 @@ module_args:
   # Flag to indicate whether to use gradient checkpointing
   gradient_checkpointing: False
   # Feature dim (similar to ViT-Giant)
-  dim: 1536
+  dim: 512
   # Number of heads (similar to ViT-Giant)
-  num_heads: 24
+  num_heads: 8
   # Set transformer parameters similar to DINOv2
   mlp_ratio: 4
   qkv_bias: True

@@ -45,7 +45,5 @@ check_loss_instability: True
 max_loss_value: 1000
 
 # JEPA training mode
-jepa: false
-# EMA target model parameters update settings
-target_ema: [0.996, 1.0]
-ema_ipe_scale: 1.0
+jepa: {}
+probe: false

@@ -3,7 +3,7 @@ UniCeption Alternating-Attention Transformer for Information Sharing
 """
 
 from functools import partial
-from typing import Callable, List, Optional, Tuple, Type, Union
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
@@ -39,40 +39,44 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
 
     def __init__(
         self,
-        adapter_indices: List[int] = [7, 11, 15],
+        adapter: Dict,
         *args,
         **kwargs,
     ):
         # Init the base classes
         super().__init__(*args, **kwargs)
 
-        self.adapter_indices = adapter_indices
+        self.adapter_dim = adapter["dim"]
+        self.adapter_num_heads = adapter["num_heads"]
+        self.adapter_mlp_ratio = adapter["mlp_ratio"]
+        self.adapter_indices = adapter["indices"]
 
         self.branch_projector = ResidualBlock(self.input_embed_dim, self.input_embed_dim)
 
-        if self.input_embed_dim != self.dim:
-            self.adapter_proj_embed = nn.Linear(self.input_embed_dim, self.dim, bias=True)
+        if self.input_embed_dim != self.adapter_dim:
+            adapter_proj_embeds = [nn.Linear(self.input_embed_dim, self.adapter_dim) for _ in range(1 + len(self.adapter_indices))]
         else:
-            self.adapter_proj_embed = nn.Identity()
+            adapter_proj_embeds = [nn.Identity() for _ in range(1 + len(self.adapter_indices))]
+        self.adapter_proj_embeds = nn.ModuleList(adapter_proj_embeds)
 
         self.adapter_interactions = nn.ModuleList(
             [
                 Extractor(
-                    dim=self.dim,
-                    num_heads=6,
+                    dim=self.adapter_dim,
+                    num_heads=8,
                     n_points=4,
                     cffn_ratio=0.25,
                 )
-                for _ in range(len(adapter_indices))
+                for _ in range(len(self.adapter_indices))
             ]
         )
 
         self.adapter_attentions = nn.ModuleList(
             [
                 SelfAttentionBlock(
-                    dim=self.dim,
-                    num_heads=self.num_heads,
-                    mlp_ratio=self.mlp_ratio,
+                    dim=self.adapter_dim,
+                    num_heads=self.adapter_num_heads,
+                    mlp_ratio=self.adapter_mlp_ratio,
                     qkv_bias=self.qkv_bias,
                     qk_norm=self.qk_norm,
                     proj_drop=self.proj_drop,
@@ -88,11 +92,11 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
                     base_token_count_for_entropy_scaling=self.base_token_count_for_entropy_scaling,
                     entropy_scaling_growth_factor=self.entropy_scaling_growth_factor,
                 )
-                for _ in range(len(adapter_indices))
+                for _ in range(2 * len(self.adapter_indices))
             ]
         )
 
-        self.adapter_norm = self.norm_layer(self.dim)
+        self.adapter_norm = self.norm_layer(self.adapter_dim)
 
     def stop_non_adapter_gradient_flow(self):
         """
@@ -104,7 +108,7 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
         for param in self.branch_projector.parameters():
             param.requires_grad = True
 
-        for param in self.adapter_proj_embed.parameters():
+        for param in self.adapter_proj_embeds.parameters():
             param.requires_grad = True
 
         for param in self.adapter_interactions.parameters():
@@ -156,7 +160,7 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
 
         # Get the indices of the intermediate features to return
         intermediate_multi_view_features = []
-        intermediate_branch_features = []
+        adapter_multi_view_features = []
         take_indices, _ = feature_take_indices(self.depth, self.indices)
 
         # Initialize the multi-view features from the model input and number of views for current input
@@ -257,7 +261,7 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
         # Project input features to the transformer dimension
         multi_view_features = self.proj_embed(multi_view_features)
         # @NEW, Project branch features to the transformer dimension
-        branch_features = self.adapter_proj_embed(branch_features)
+        branch_features = self.adapter_proj_embeds[0](branch_features)
 
         # Raise error if custom positional encoding is used with additional tokens
         if self.custom_positional_encoding is not None:
@@ -420,6 +424,8 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
                     batch_size * num_of_views, height * width, self.dim
                 ).contiguous()  # (N * V, H * W, C)
 
+                deform_values = self.adapter_proj_embeds[self.adapter_indices.index(depth_idx) + 1](deform_values)
+
                 # Apply the interaction block to fuse information from the branch features
                 extractor = self.adapter_interactions[self.adapter_indices.index(depth_idx)]
                 branch_features = extractor(
@@ -429,19 +435,24 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
                     H=height, W=width,
                 )  # (N * V, H * W, C)
 
+                branch_features = self.adapter_attentions[2 * self.adapter_indices.index(depth_idx)](
+                    branch_features, multi_view_positions if multi_view_positions[0] is not None else None
+                )  # (N * V, H * W, C)
+
                 # Extra global attention
                 branch_features = branch_features.reshape(
-                    batch_size, num_of_views * height * width, self.dim
+                    batch_size, num_of_views * height * width, self.adapter_dim
                 ).contiguous()  # (N, V * H * W, C)
-                branch_features = self.adapter_attentions[self.adapter_indices.index(depth_idx)](
+                
+                branch_features = self.adapter_attentions[2 * self.adapter_indices.index(depth_idx) + 1](
                     branch_features, multi_view_positions if multi_view_positions[0] is not None else None
                 )  # (N, V * H * W, C)
 
-                intermediate_branch_features.append(
+                adapter_multi_view_features.append(
                     self.adapter_norm(branch_features) if self.norm_intermediate else branch_features
                 )
                 branch_features = branch_features.reshape(
-                    batch_size * num_of_views, height * width, self.dim
+                    batch_size * num_of_views, height * width, self.adapter_dim
                 ).contiguous()  # (N * V, H * W, C)
 
         # Reshape the intermediate features and convert to MultiViewTransformerOutput class
@@ -478,12 +489,12 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
             )
 
         # @NEW, Reshape the intermediate btranch features and convert to MultiViewTransformerOutput class
-        for idx in range(len(intermediate_branch_features)):
+        for idx in range(len(adapter_multi_view_features)):
             # Get the current intermediate features
-            current_features = intermediate_branch_features[idx]
+            current_features = adapter_multi_view_features[idx]
 
             view_features = current_features.reshape(
-                batch_size, num_of_views, height, width, self.dim
+                batch_size, num_of_views, height, width, self.adapter_dim
             )  # (N, V, H, W, C)
             view_features = view_features.permute(0, 1, 4, 2, 3).contiguous()  # (N, V, C, H, W)
             # Split the intermediate multi-view features into separate views
@@ -491,11 +502,11 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
             view_features = [
                 intermediate_view_features.squeeze(dim=1) for intermediate_view_features in view_features
             ]
-            intermediate_branch_features[idx] = MultiViewTransformerOutput(features=view_features)
+            adapter_multi_view_features[idx] = MultiViewTransformerOutput(features=view_features)
 
         # # Return only the intermediate features if enabled
         # if self.intermediates_only:
-        #     return intermediate_multi_view_features, intermediate_branch_features
+        #     return intermediate_multi_view_features, adapter_multi_view_features
 
         # Normalize the output features
         output_multi_view_features = self.norm(multi_view_features)
@@ -551,4 +562,4 @@ class MVAATAdapterIFR(MultiViewAlternatingAttentionTransformerIFR):
             additional_token_features_per_view=additional_token_features_per_view,
         )
 
-        return output_multi_view_features, intermediate_multi_view_features, intermediate_branch_features
+        return output_multi_view_features, intermediate_multi_view_features, adapter_multi_view_features

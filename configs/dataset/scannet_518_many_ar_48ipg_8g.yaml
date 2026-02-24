@@ -1,0 +1,23 @@
+defaults:
+  - default
+
+# Number of views parameter for the multi-view datasets
+num_views: 4
+
+train:
+  # If True, the number of views can vary from batch to batch. The maximum number of views is num_views and minimum is 2. (On by default for N-view training)
+  variable_num_views: true
+
+# Train Resolution
+resolution_train: ${dataset.resolution_options.518_many_ar}
+
+# Validation Resolution
+resolution_val_scannet: ${dataset.resolution_options.518_1_33_ar}
+
+# Training Set
+train_dataset:
+  "+ 140_000 @ ${dataset.scannet_wai.train.dataset_str}"
+
+# Validation Set
+test_dataset:
+  "+ 4_000 @ ${dataset.scannet_wai.val.dataset_str}"

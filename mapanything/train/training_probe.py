@@ -32,8 +32,7 @@ from mapanything.datasets import get_test_data_loader, get_train_data_loader
 from mapanything.models import init_model
 from mapanything.train.losses import *  # noqa
 from mapanything.train.losses_jepa import JEPALoss, LinearProbeLoss
-from mapanything.train.training import build_dataset
-from mapanything.utils.inference import loss_of_one_batch_multi_view
+from mapanything.train.training import build_dataset, save_final_model
 from mapanything.utils.train_tools import NativeScalerWithGradNormCount as NativeScaler
 
 # Enable TF32 precision if supported (for GPU >= Ampere and PyTorch >= 1.12)
@@ -43,15 +42,8 @@ if hasattr(torch.backends.cuda, "matmul") and hasattr(
     torch.backends.cuda.matmul.allow_tf32 = True
 
 
-def train_jepa(args):
-    """
-    JEPA training version of train().
-    This function adds target model and EMA updates for JEPA training.
+def train_probe(args):
 
-    Args:
-        args: Configuration object containing all training parameters including
-              dataset configs, model configs, training parameters, and loss functions.
-    """
     # Initialize distributed training if required
     train_tools.init_distributed_mode(args.distributed)
     global_rank = train_tools.get_rank()
@@ -99,19 +91,28 @@ def train_jepa(args):
         if "(" in dataset
     }
 
+    print("Loading pretrained: ", args.model.pretrained)
+    ckpt = torch.load(
+        args.model.pretrained, map_location=device, weights_only=False
+    )
+    ckpt_args = ckpt["args"]
+
     # Load Model
     if global_rank == 0:
         model = init_model(
-            args.model.model_str,
-            args.model.model_config,
-            torch_hub_force_reload=args.model.torch_hub_force_reload,
+            ckpt_args.model.model_str,
+            ckpt_args.model.model_config,
+            torch_hub_force_reload=ckpt_args.model.torch_hub_force_reload,
         )
     if torch.distributed.is_initialized():
         torch.distributed.barrier()  # Make sure the model is initialized before proceeding
     if global_rank != 0:
         model = init_model(
-            args.model.model_str, args.model.model_config, torch_hub_force_reload=False
+            ckpt_args.model.model_str, ckpt_args.model.model_config, torch_hub_force_reload=False
         )
+
+    print(model.load_state_dict(ckpt["model"], strict=False))
+    del ckpt  # in case it occupies memory
 
     model.to(device)  # Move model to device
     model_without_ddp = model
@@ -126,18 +127,6 @@ def train_jepa(args):
     test_criterion = eval(args.loss.test_criterion or args.loss.train_criterion).to(
         device
     )
-
-    # Load pretrained model if provided
-    if args.model.pretrained:
-        print("Loading pretrained: ", args.model.pretrained)
-        ckpt = torch.load(
-            args.model.pretrained, map_location=device, weights_only=False
-        )
-        print(model.load_state_dict(ckpt["model"], strict=False))
-        del ckpt  # in case it occupies memory
-
-    target_model = deepcopy(model)
-    target_model_without_ddp = target_model
     
     # Init model for DDP training
     if args.distributed.distributed:
@@ -149,16 +138,7 @@ def train_jepa(args):
         )
         model_without_ddp = model.module
 
-        target_model = torch.nn.parallel.DistributedDataParallel(
-            target_model,
-            device_ids=[args.distributed.gpu],
-            find_unused_parameters=True,
-            static_graph=False,
-        )
-        target_model_without_ddp = target_model.module
-
         # model_without_ddp = model
-        # target_model_without_ddp = target_model
 
     # Optimizer and loss scaler for gradient accumulation
     # Following timm: set wd as 0 for bias and norm layers
@@ -214,10 +194,9 @@ def train_jepa(args):
             fname: Filename or identifier for the checkpoint.
             best_so_far: Best validation metric achieved so far.
         """
-        save_model_jepa(
+        train_tools.save_model(
             args=args,
             model_without_ddp=model_without_ddp,
-            target_model_without_ddp=target_model_without_ddp,
             optimizer=optimizer,
             loss_scaler=loss_scaler,
             epoch=epoch,
@@ -231,10 +210,9 @@ def train_jepa(args):
         args.train_params.resume_ckpt = last_ckpt_fname
     else:
         args.train_params.resume_ckpt = None
-    best_so_far = load_model_jepa(
+    best_so_far = train_tools.load_model(
         train_args=args.train_params,
         model_without_ddp=model_without_ddp,
-        target_model_without_ddp=target_model_without_ddp,
         optimizer=optimizer,
         loss_scaler=loss_scaler,
     )
@@ -245,17 +223,6 @@ def train_jepa(args):
         log_writer = SummaryWriter(log_dir=args.output_dir)
     else:
         log_writer = None
-
-    # -- momentum schedule
-    ema = args.train_params.jepa.ema
-    ipe = len(data_loader_train) // args.train_params.accum_iter  # iterations per epoch
-    num_epochs = args.train_params.epochs
-    ipe_scale = args.train_params.jepa.ema_ipe_scale
-    momentum_scheduler = (ema[0] + i*(ema[1]-ema[0]) / (ipe * num_epochs * ipe_scale)
-                          for i in range(int(ipe * num_epochs * ipe_scale) + 1))
-
-    for _ in range(args.train_params.start_epoch * ipe):
-        next(momentum_scheduler)
 
     print(f"Start training for {args.train_params.epochs} epochs")
     start_time = time.time()
@@ -282,7 +249,6 @@ def train_jepa(args):
                 print(f"Testing on {test_name} ...")
                 stats = test_one_epoch(
                     model,
-                    target_model,
                     test_criterion,
                     testset,
                     device,
@@ -291,7 +257,6 @@ def train_jepa(args):
                     args=args,
                     prefix=test_name,
                     model_without_ddp=model_without_ddp,
-                    target_model_without_ddp=target_model_without_ddp,
                 )
                 test_stats[test_name] = stats
 
@@ -319,7 +284,6 @@ def train_jepa(args):
         # Train
         train_stats = train_one_epoch(
             model,
-            target_model,
             train_criterion,
             data_loader_train,
             optimizer,
@@ -331,138 +295,20 @@ def train_jepa(args):
             param_groups_name_to_idx_map=param_groups_name_to_idx_map,
             param_groups_idx_to_name_map=param_groups_idx_to_name_map,
             model_without_ddp=model_without_ddp,
-            target_model_without_ddp=target_model_without_ddp,
         )
-
-        with torch.no_grad():
-            m = next(momentum_scheduler)
-            for param_q, param_k in zip(model_without_ddp.parameters(), target_model_without_ddp.parameters()):
-                param_k.data.mul_(m).add_((1.-m) * param_q.detach().data)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print("Training time {}".format(total_time_str))
 
-    save_final_model_jepa(
-        args, args.train_params.epochs, model_without_ddp, target_model_without_ddp, best_so_far=best_so_far
+    save_final_model(
+        args, args.train_params.epochs, model_without_ddp, best_so_far=best_so_far
     )
 
 
-def save_model_jepa(
-    args, epoch, model_without_ddp, target_model_without_ddp, optimizer, loss_scaler, fname=None, best_so_far=None
-):
-    """
-    Save model checkpoint to disk.
-
-    This function saves the model state, optimizer state, loss scaler state,
-    training arguments, current epoch, and optionally the best metric value so far.
-    The checkpoint is only saved on the master process in distributed training.
-
-    Args:
-        args: Arguments containing output directory information
-        epoch (int): Current training epoch
-        model_without_ddp (torch.nn.Module): Model without DistributedDataParallel wrapper
-        optimizer (torch.optim.Optimizer): Optimizer instance
-        loss_scaler: Gradient scaler for mixed precision training
-        fname (str, optional): Custom filename suffix. If None, uses the epoch number. Defaults to None.
-        best_so_far (float, optional): Best metric value achieved so far. Defaults to None.
-    """
-    output_dir = Path(args.output_dir)
-    if fname is None:
-        fname = str(epoch)
-    checkpoint_path = output_dir / ("checkpoint-%s.pth" % fname)
-    to_save = {
-        "model": model_without_ddp.state_dict(),
-        "target_model": target_model_without_ddp.state_dict(),
-        "optimizer": optimizer.state_dict(),
-        "scaler": loss_scaler.state_dict(),
-        "args": args,
-        "epoch": epoch,
-    }
-    if best_so_far is not None:
-        to_save["best_so_far"] = best_so_far
-    print(f">> Saving model to {checkpoint_path} ...")
-    train_tools.save_on_master(to_save, checkpoint_path)
-
-
-def load_model_jepa(train_args, model_without_ddp, target_model_without_ddp, optimizer, loss_scaler):
-    """
-    Load model checkpoint from disk or URL.
-
-    This function loads a saved checkpoint, restoring the model state, optimizer state,
-    loss scaler state, and training epoch. It can load from a local file or a URL.
-
-    Args:
-        train_args: Training arguments containing resume information
-        model_without_ddp (torch.nn.Module): Model without DistributedDataParallel wrapper
-        optimizer (torch.optim.Optimizer): Optimizer instance
-        loss_scaler: Gradient scaler for mixed precision training
-
-    Returns:
-        float or None: Best metric value from the checkpoint if available, otherwise None
-    """
-    train_args.start_epoch = 0
-    best_so_far = None
-    if train_args.resume and train_args.resume_ckpt is not None:
-        if train_args.resume_ckpt.startswith("https"):
-            checkpoint = torch.hub.load_state_dict_from_url(
-                train_args.resume_ckpt, map_location="cpu", check_hash=True
-            )
-        else:
-            checkpoint = torch.load(
-                train_args.resume_ckpt, map_location="cpu", weights_only=False
-            )
-        print("Resume checkpoint %s" % train_args.resume_ckpt)
-        model_without_ddp.load_state_dict(checkpoint["model"], strict=False)
-        target_model_without_ddp.load_state_dict(checkpoint["target_model"], strict=False)
-        train_args.start_epoch = checkpoint["epoch"] + 1
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        if "scaler" in checkpoint:
-            loss_scaler.load_state_dict(checkpoint["scaler"])
-        if "best_so_far" in checkpoint:
-            best_so_far = checkpoint["best_so_far"]
-            print(" & best_so_far={:g}".format(best_so_far))
-        else:
-            print("")
-        print(
-            "With optim & sched! start_epoch={:d}".format(train_args.start_epoch),
-            end="",
-        )
-    return best_so_far
-
-
-def save_final_model_jepa(args, epoch, model_without_ddp, target_model_without_ddp, best_so_far=None):
-    """
-    Saves the final model checkpoint after training completion.
-
-    Args:
-        args: Configuration object containing output directory information.
-        epoch: Current epoch number.
-        model_without_ddp: Model state dictionary or model instance without DistributedDataParallel wrapper.
-        best_so_far: Optional; Best validation metric achieved during training.
-    """
-    output_dir = Path(args.output_dir)
-    checkpoint_path = output_dir / "checkpoint-final.pth"
-    to_save = {
-        "args": args,
-        "model": model_without_ddp
-        if isinstance(model_without_ddp, dict)
-        else model_without_ddp.cpu().state_dict(),
-        "target_model": target_model_without_ddp
-        if isinstance(target_model_without_ddp, dict)
-        else target_model_without_ddp.cpu().state_dict(),
-        "epoch": epoch,
-    }
-    if best_so_far is not None:
-        to_save["best_so_far"] = best_so_far
-    print(f">> Saving model to {checkpoint_path} ...")
-    train_tools.save_on_master(to_save, checkpoint_path)
-
-
-def loss_of_one_batch_jepa(
+def loss_of_one_batch_probe(
     batch,
     model,
-    target_model,
     criterion,
     device,
     use_amp=False,
@@ -470,29 +316,7 @@ def loss_of_one_batch_jepa(
     ret=None,
     ignore_keys=None,
     model_without_ddp=None,
-    target_model_without_ddp=None,
 ):
-    """
-    Calculate loss for a batch with multiple views.
-    JEPA version that handles both model and target_model.
-
-    Args:
-        batch (list): List of view dictionaries containing input data.
-        model (torch.nn.Module): Model to run inference with.
-        target_model (torch.nn.Module): Target model to run inference with.
-        criterion (callable, optional): Loss function to compute the loss.
-        device (torch.device): Device to run the computation on.
-        use_amp (bool, optional): Whether to use automatic mixed precision. Defaults to False.
-        amp_dtype (str, optional): Floating point type to use for automatic mixed precision. Options: ["fp32", "fp16", "bf16"]. Defaults to "bf16".
-        ret (str, optional): If provided, return only the specified key from the result dictionary.
-        ignore_keys (set, optional): Set of keys to ignore when moving tensors to device.
-                                   Defaults to {"dataset", "label", "instance",
-                                   "idx", "true_shape", "rng", "data_norm_type"}.
-
-    Returns:
-        dict or Any: If ret is None, returns a dictionary containing views, predictions, and loss.
-                     Otherwise, returns the value associated with the ret key.
-    """
     # Move necessary tensors to device
     if ignore_keys is None:
         ignore_keys = set(
@@ -530,19 +354,15 @@ def loss_of_one_batch_jepa(
     else:
         amp_dtype = torch.float32
 
-    model_without_ddp.contextualize()
-    target_model_without_ddp.decontextualize()
-
     # Run model and compute loss
     with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
-        ctx_out = model(batch)
-        tgt_out = target_model(batch)
+        model_without_ddp.decontextualize()
+        full_out = model(batch, probe=True)
 
         with torch.autocast("cuda", enabled=False):
             loss = criterion(
                 batch,
-                ctx_out=ctx_out,
-                tgt_out=tgt_out,
+                full_out=full_out
             ) if criterion is not None else None
 
     result = {f"view{i + 1}": view for i, view in enumerate(batch)}
@@ -554,7 +374,6 @@ def loss_of_one_batch_jepa(
 
 def train_one_epoch(
     model: torch.nn.Module,
-    target_model: torch.nn.Module,
     criterion: torch.nn.Module,
     data_loader: Sized,
     optimizer: torch.optim.Optimizer,
@@ -566,39 +385,12 @@ def train_one_epoch(
     param_groups_name_to_idx_map=None,
     param_groups_idx_to_name_map=None,
     model_without_ddp=None,
-    target_model_without_ddp=None,
 ):
-    """
-    Trains the model for one epoch.
-    JEPA version that handles both model and target_model.
-
-    Args:
-        model: The neural network model to train.
-        target_model: The target neural network model for JEPA training.
-        criterion: Loss function to optimize.
-        data_loader: DataLoader providing the training data.
-        optimizer: Optimizer for updating model parameters.
-        device: Device to run training on (CPU or GPU).
-        epoch: Current epoch number.
-        loss_scaler: Scaler for gradient accumulation and mixed precision training.
-        args: Configuration object containing training parameters.
-        log_writer: Optional; TensorBoard SummaryWriter for logging.
-        param_groups_name_to_idx_map: Mapping from parameter group names to indices.
-        param_groups_idx_to_name_map: Mapping from parameter group indices to names.
-        model_without_ddp: Model without DistributedDataParallel wrapper for debugging.
-        target_model_without_ddp: Target model without DistributedDataParallel wrapper for debugging.
-
-    Returns:
-        dict: Dictionary containing training metrics averaged over the epoch.
-    """
+    
     model.train(True)
 
     # Stop gradient flow for non-adapter parameters
-    model_without_ddp.stop_non_adapter_gradient_flow()
-
-    # Ensure target model parameters are not updated
-    for param in target_model_without_ddp.parameters():
-        param.requires_grad = False
+    model_without_ddp.stop_non_probe_gradient_flow()
 
     metric_logger = train_tools.MetricLogger(delimiter="  ")
     for submodule_name in param_groups_name_to_idx_map:
@@ -639,17 +431,15 @@ def train_one_epoch(
                 args.train_params.submodule_configs,
             )
 
-        loss_tuple = loss_of_one_batch_jepa(
+        loss_tuple = loss_of_one_batch_probe(
             batch,
             model,
-            target_model,
             criterion,
             device,
             use_amp=bool(args.train_params.amp),
             amp_dtype=args.train_params.amp_dtype,
             ret="loss",
             model_without_ddp=model_without_ddp,
-            target_model_without_ddp=target_model_without_ddp,
         )
         loss, loss_details = loss_tuple  # criterion returns two values
         loss_value = float(loss)
@@ -677,11 +467,6 @@ def train_one_epoch(
                     model_without_ddp
                     if isinstance(model_without_ddp, dict)
                     else model_without_ddp.cpu().state_dict()
-                ),
-                "target_model": (
-                    target_model_without_ddp
-                    if isinstance(target_model_without_ddp, dict)
-                    else target_model_without_ddp.cpu().state_dict()
                 ),
                 "epoch": epoch,
                 "data_iter_step": data_iter_step,
@@ -757,7 +542,6 @@ def train_one_epoch(
 @torch.no_grad()
 def test_one_epoch(
     model: torch.nn.Module,
-    target_model: torch.nn.Module,
     criterion: torch.nn.Module,
     data_loader: Sized,
     device: torch.device,
@@ -766,26 +550,7 @@ def test_one_epoch(
     log_writer=None,
     prefix="test",
     model_without_ddp=None,
-    target_model_without_ddp=None,
 ):
-    """
-    Evaluates the model on a test dataset for one epoch.
-    JEPA version that handles both model and target_model.
-
-    Args:
-        model: The neural network model to evaluate.
-        target_model: The target neural network model for JEPA training.
-        criterion: Loss function for evaluation.
-        data_loader: DataLoader providing the test data.
-        device: Device to run evaluation on (CPU or GPU).
-        epoch: Current epoch number.
-        args: Configuration object containing evaluation parameters.
-        log_writer: Optional; TensorBoard SummaryWriter for logging.
-        prefix: String prefix for logging metrics.
-
-    Returns:
-        dict: Dictionary containing evaluation metrics (average and median values).
-    """
     model.eval()
     metric_logger = train_tools.MetricLogger(delimiter="  ")
     metric_logger.meters = defaultdict(
@@ -813,17 +578,15 @@ def test_one_epoch(
         metric_logger.log_every(data_loader, args.train_params.print_freq, header)
     ):
         n_views = len(batch)
-        loss_tuple = loss_of_one_batch_jepa(
+        loss_tuple = loss_of_one_batch_probe(
             batch,
             model,
-            target_model,
             criterion,
             device,
             use_amp=bool(args.train_params.amp),
             amp_dtype=args.train_params.amp_dtype,
             ret="loss",
             model_without_ddp=model_without_ddp,
-            target_model_without_ddp=target_model_without_ddp,
         )
         loss_value, loss_details = loss_tuple  # criterion returns two values
         metric_logger.update(loss=float(loss_value), **loss_details)

@@ -14,6 +14,7 @@ defaults:
   - spring_wai: default
   - tav2_wb_wai: default
   - unrealstereo4k_wai: default
+  - scannet_wai: default
 
 # Training Set, For example: BlendedMVS(split='train', resolution=(512, 384), transform=...)
 train_dataset: ???

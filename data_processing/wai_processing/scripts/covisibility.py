@@ -10,6 +10,7 @@ import shutil
 import traceback
 from pathlib import Path
 
+import numpy as np
 import torch
 from argconf import argconf_parse
 from tqdm import tqdm
@@ -179,11 +180,16 @@ if __name__ == "__main__":
 
     device = cfg.get("device", "cuda")
     scene_names = get_scene_names(
-        cfg, shuffle=cfg.get("random_scene_processing_order", True)
+        cfg, shuffle=cfg.get("random_scene_processing_order", False)
     )
     scene_names = get_scene_names(
-        cfg, shuffle=cfg.get("random_scene_processing_order", True)
+        cfg, shuffle=cfg.get("random_scene_processing_order", False)
     )
+    
+    scene_names.sort()  # ensure the order is the same across different runs for stable distributed processing
+    scene_names_splits = np.array_split(scene_names, cfg.get("world_size", 1))
+    scene_names = scene_names_splits[cfg.get("rank", 0)].tolist()
+
     logger.info(f"processing: {len(scene_names)} scenes")
     logger.debug(f"scene_names = {scene_names}")
 

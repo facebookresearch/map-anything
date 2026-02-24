@@ -1,0 +1,17 @@
+original_root: /comp_robot/cv_public_dataset/scannetv2/
+root: /comp_robot/cv_public_dataset/scannetv2/wai
+
+export_cache_root: /comp_robot/cv_public_dataset/scannetv2/sens
+
+dataset_name: scannetv2
+version: 0.1
+overwrite: False
+
+enable_2d_semantic: True
+enable_2d_instance: True
+prefer_filtered_2d_labels: True
+
+frame_skip: 1
+
+scene_filters:
+  - process_state_not: [conversion, finished]

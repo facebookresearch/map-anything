@@ -8,6 +8,7 @@ import os
 import shutil
 import traceback
 from pathlib import Path
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -178,7 +179,7 @@ if __name__ == "__main__":
         logger.info(f"  {key}: {value}")
 
     scene_names = get_scene_names(
-        cfg, shuffle=cfg.get("random_scene_processing_order", True)
+        cfg, shuffle=cfg.get("random_scene_processing_order", False)
     )
 
     model_path = Path(cfg.model_path)
@@ -187,13 +188,15 @@ if __name__ == "__main__":
     logger.info(f"Processing: {len(scene_names)} scenes")
     logger.debug(f"scene_names = {scene_names}")
 
-    for scene_name in tqdm(scene_names, "Processing scenes"):
+    scene_names_splits = np.array_split(scene_names, cfg.get("world_size", 1))
+    scene_names_ = scene_names_splits[cfg.get("rank", 0)].tolist()
+    for scene_name in tqdm(scene_names_, "Processing scenes"):
         try:
             scene_root = Path(cfg.root) / scene_name
             with SceneProcessLock(scene_root):
                 logger.info(f"Processing: {scene_name}")
                 set_processing_state(scene_root, "moge", "running")
-                run_moge_on_scene(cfg, scene_name, model, cfg.overwrite)
+                run_moge_on_scene(cfg, scene_name, model, cfg.overwrite or True)
                 set_processing_state(scene_root, "moge", "finished")
         except Exception:
             logger.error(f"Running MoGe failed on scene '{scene_name}'")

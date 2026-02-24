@@ -1,0 +1,5 @@
+# Module arguments
+module_args:
+  # Name of the probe
+  name: "linear_probe_20_cls"
+  dim: 20

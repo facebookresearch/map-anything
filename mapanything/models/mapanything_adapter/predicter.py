@@ -410,6 +410,7 @@ class Predicter(nn.Module):
         )  # (V * B)
 
         per_sample_target_mask = target_mask.repeat_interleave(batch_size_per_view)  # (V * B)
+        # per_sample_target_mask = per_sample_target_mask * 0  # Testing: disable all target masks in JEPA
 
         # Compute the pose quats and trans for all the non-reference views in the frame of the reference view 0
         # Returned pose quats and trans represent identity pose for views/samples where the camera input mask is False

@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Tuple, Type, Union
 import torch
 import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
+from torchvision.transforms.functional import resize
 
 from mapanything.models.mapanything.model import MapAnything
 from mapanything.models.mapanything_adapter.alternating_attention_adapter import (
@@ -30,6 +31,7 @@ from mapanything.utils.inference import (
     preprocess_input_views_for_inference,
     validate_input_views_for_inference,
 )
+from mapanything.utils.pca import pca_visualize_features
 from uniception.models.encoders import (
     encoder_factory,
     EncoderGlobalRepInput,
@@ -51,6 +53,7 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
     def __init__(
         self,
         predicter_config: Dict,
+        probe_config: Dict,
         intermediates_only: bool = False,
         *args: Any,
         **kwargs: Any,
@@ -61,12 +64,14 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
         super().__init__(*args, **kwargs)
 
         self.predicter = Predicter(
-            self.encoder.enc_embed_dim,
+            self.info_sharing.adapter_dim,
             self.encoder.patch_size,
             predicter_config,
             kwargs["geometric_input_config"],
             # kwargs["fusion_norm_layer"],
         )
+
+        self.probe = nn.Conv2d(self.info_sharing.adapter_dim, probe_config["module_args"]["dim"], 1, 1, 0)
 
     @property
     def device(self) -> torch.device:
@@ -168,6 +173,13 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
             param.requires_grad = True
 
         self.info_sharing.stop_non_adapter_gradient_flow()
+
+    def stop_non_probe_gradient_flow(self):
+        for param in self.parameters():
+            param.requires_grad = False
+        
+        for param in self.probe.parameters():
+            param.requires_grad = True
 
     def _encode_and_fuse_optional_geometric_inputs(
         self, views, all_encoder_features_across_views_list
@@ -318,7 +330,7 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
 
         return fused_all_encoder_features_across_views, target_mask
 
-    def forward(self, views, memory_efficient_inference=False):
+    def forward(self, views, memory_efficient_inference=False, probe=False):
         """
         Forward pass performing the following operations:
         1. Encodes the N input views (images).
@@ -386,7 +398,7 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
         (
             final_info_sharing_multi_view_feat,
             intermediate_info_sharing_multi_view_feat,
-            intermediate_info_sharing_branch_feat,
+            adapter_multi_view_feat,
         ) = self.info_sharing(info_sharing_input)
 
         # Make target predictions from masked multi-view features if in context mode
@@ -395,12 +407,28 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
             pred_target_feat = self.predicter(
                 views,
                 target_mask,
-                intermediate_info_sharing_branch_feat[-1],
-            )
+                adapter_multi_view_feat[-1],
+            )        
 
         # If only intermediate features are needed, return them directly
         if self.intermediates_only:
-            return intermediate_info_sharing_branch_feat, pred_target_feat, target_mask
+            res = []
+            for i in range(num_views):
+                res_i = {
+                    "adapter_features": [feat.features[i] for feat in adapter_multi_view_feat],
+                    "predicter_feature": pred_target_feat.features[i] if pred_target_feat is not None else None,
+                    "target_mask": bool(target_mask[i]) if target_mask is not None else None,
+                }
+
+                if probe:
+                    x = res_i["adapter_features"][-1].detach()
+                    x = self.probe(x)  # (B, cls, H, W)
+                    x = nn.functional.interpolate(x, scale_factor=14, mode="bilinear")
+                    res_i["probe_logits"] = x
+
+                res.append(res_i)
+
+            return res
         
         if self.pred_head_type == "linear":
             # Stack the features for all views
@@ -767,6 +795,15 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
                     res[i]["non_ambiguous_mask"] = output_masks_per_view[i]
                     res[i]["non_ambiguous_mask_logits"] = output_mask_logits_per_view[i]
 
+            features = torch.cat(adapter_multi_view_feat[-1].features, dim=0)  # (B * V, C, H, W)
+            features = pca_visualize_features(features.permute(0, 2, 3, 1)).permute(0, 3, 1, 2).contiguous()
+            features = resize(features, img_shape)
+            features = features.chunk(num_views, dim=0)
+
+            # Add the adapter features to the result
+            for i in range(num_views):
+                res[i]["feat_viz"] = features[i].permute(0, 2, 3, 1).contiguous()
+
         return res
 
     @torch.inference_mode()
@@ -774,6 +811,7 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
         self,
         views: List[Dict[str, Any]],
         memory_efficient_inference: bool = False,
+        probe: bool = False,
         use_amp: bool = True,
         amp_dtype: str = "bf16",
         apply_mask: bool = True,
@@ -906,7 +944,7 @@ class MapAnythingAdapter(MapAnything, PyTorchModelHubMixin):
         # Run the model
         with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
             preds = self.forward(
-                processed_views, memory_efficient_inference=memory_efficient_inference
+                processed_views, memory_efficient_inference=memory_efficient_inference, probe=probe,
             )
 
         if self.intermediates_only:

@@ -21,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from mapanything.train.training import train
 from mapanything.train.training_jepa import train_jepa
+from mapanything.train.training_probe import train_probe
 from mapanything.utils.misc import StreamToLogger
 
 log = logging.getLogger(__name__)
@@ -42,10 +43,12 @@ def execute_training(cfg: DictConfig):
     sys.stderr = StreamToLogger(log, logging.ERROR)
 
     # Run the training
-    if not cfg.train_params.jepa:
-        train(cfg)
-    else:
+    if cfg.train_params.jepa:
         train_jepa(cfg)
+    elif cfg.train_params.probe:
+        train_probe(cfg)
+    else:
+        train(cfg)
 
 
 if __name__ == "__main__":

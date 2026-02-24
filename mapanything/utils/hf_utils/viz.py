@@ -161,6 +161,7 @@ def predictions_to_glb(
     mask_ambiguous=False,
     as_mesh=True,
     conf_percentile=None,
+    show_feat=False,
 ) -> trimesh.Scene:
     """
     Converts MapAnything predictions to a 3D scene represented as a GLB file.
@@ -206,7 +207,7 @@ def predictions_to_glb(
     pred_world_points = predictions["world_points"]
 
     # Get images from predictions
-    images = predictions["images"]
+    images = predictions["images"] if not show_feat else predictions["feat_viz"]
     # Use extrinsic matrices instead of pred_extrinsic_list
     camera_matrices = predictions["extrinsic"]
 

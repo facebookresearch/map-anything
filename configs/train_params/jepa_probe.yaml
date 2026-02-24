@@ -1,0 +1,7 @@
+defaults:
+  - default
+
+lr: 1e-04
+min_lr: 1e-07
+
+probe: true

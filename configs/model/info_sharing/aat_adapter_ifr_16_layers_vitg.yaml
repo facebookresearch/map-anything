@@ -30,4 +30,8 @@ module_args:
   qk_norm: False
   init_values: 1e-5
   # Adapter specific parameters
-  adapter_indices: [7, 11, 15]
+  adapter:
+    dim: 512
+    num_heads: 8
+    mlp_ratio: 4
+    indices: [7, 11, 15]

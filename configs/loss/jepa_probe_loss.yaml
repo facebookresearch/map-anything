@@ -1,0 +1,4 @@
+# Training Loss
+train_criterion: "LinearProbeLoss()"
+# Validation Loss
+test_criterion: "LinearProbeLoss()"

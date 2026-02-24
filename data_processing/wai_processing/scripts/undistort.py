@@ -292,6 +292,11 @@ if __name__ == "__main__":
     scene_names = get_scene_names(
         cfg, shuffle=cfg.get("random_scene_processing_order", True)
     )
+
+    scene_names.sort()  # ensure the order is the same across different runs for stable distributed processing
+    scene_names_splits = np.array_split(scene_names, cfg.get("world_size", 1))
+    scene_names = scene_names_splits[cfg.get("rank", 0)].tolist()
+
     for scene_name in tqdm(scene_names, "Undistorting scenes"):
         try:
             scene_root = Path(cfg.root) / scene_name

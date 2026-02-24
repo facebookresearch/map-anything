@@ -15,6 +15,7 @@ import time
 from datetime import datetime
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["GRADIO_TEMP_DIR"] = "/comp_robot/yinrui/tmp"
 
 import cv2
 import gradio as gr
@@ -24,6 +25,7 @@ import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 
+from mapanything.models import init_model
 from mapanything.utils.geometry import depthmap_to_world_frame, points_to_normals
 from mapanything.utils.hf_utils.css_and_html import (
     get_acknowledgements_html,
@@ -106,7 +108,20 @@ def run_model(
 
     # Initialize model if not already done
     if model is None:
-        model = initialize_mapanything_model(high_level_config, device)
+        # model = initialize_mapanything_model(high_level_config, device)
+        ckpt = torch.load('./exp/mapanything/training/mapa_curri_4v_bmvs_4ipg_18g_jepa/checkpoint-best.pth')
+        args = ckpt['args']
+
+        model = init_model(
+            args.model.model_str, args.model.model_config, torch_hub_force_reload=False
+        )
+        model.load_state_dict(ckpt['model'])
+        model.decontextualize()
+        model.intermediates_only = False
+        model = model.to(device)
+
+        del ckpt
+        torch.cuda.empty_cache()
 
     else:
         model = model.to(device)
@@ -142,6 +157,7 @@ def run_model(
     images_list = []
     final_mask_list = []
     confidences = []
+    feat_viz_list = []
     # Loop through the outputs
     for pred in outputs:
         # Extract data from predictions
@@ -167,6 +183,8 @@ def run_model(
 
         image = pred["img_no_norm"][0].cpu().numpy()
 
+        feat_viz = pred["feat_viz"][0].cpu().numpy()
+
         # Append to lists
         extrinsic_list.append(camera_pose_torch.cpu().numpy())
         intrinsic_list.append(intrinsics_torch.cpu().numpy())
@@ -175,6 +193,7 @@ def run_model(
         images_list.append(image)  # Add image to list
         final_mask_list.append(mask)  # Add final_mask to list
         confidences.append(conf.cpu().numpy())  # Add confidence to list
+        feat_viz_list.append(feat_viz)  # Add feature visualization to list
 
     # Convert lists to numpy arrays with required shapes
     # extrinsic: (S, 3, 4) - batch of camera extrinsic matrices
@@ -202,6 +221,9 @@ def run_model(
     # final_mask: (S, H, W) - batch of final masks for filtering
     predictions["final_mask"] = np.stack(final_mask_list, axis=0)
 
+    # feat_viz_list: (S, H, W, 3) - batch of feature maps
+    predictions["feat_viz"] = np.stack(feat_viz_list, axis=0)
+
     # Process data for visualization tabs (depth, normal, measure)
     processed_data = process_predictions_for_visualization(
         predictions, views, high_level_config, filter_black_bg, filter_white_bg
@@ -225,6 +247,7 @@ def update_view_selectors(processed_data):
         gr.Dropdown(choices=choices, value=choices[0]),  # depth_view_selector
         gr.Dropdown(choices=choices, value=choices[0]),  # normal_view_selector
         gr.Dropdown(choices=choices, value=choices[0]),  # measure_view_selector
+        gr.Dropdown(choices=choices, value=choices[0]),  # feature_view_selector
     )
 
 
@@ -256,6 +279,15 @@ def update_normal_view(processed_data, view_index):
         return None
 
     return colorize_normal(view_data["normal"], mask=view_data.get("mask"))
+
+
+def update_feature_view(processed_data, view_index):
+    """Update feature view for a specific view index"""
+    view_data = get_view_data_by_index(processed_data, view_index)
+    if view_data is None or view_data["feat_viz"] is None:
+        return None
+
+    return colorize_feature(view_data["feat_viz"], mask=view_data.get("mask"))
 
 
 def update_measure_view(processed_data, view_index):
@@ -296,6 +328,26 @@ def update_measure_view(processed_data, view_index):
                 ).astype(np.uint8)
 
     return image, []
+
+
+def navigate_feature_view(processed_data, current_selector_value, direction):
+    """Navigate feature view (direction: -1 for previous, +1 for next)"""
+    if processed_data is None or len(processed_data) == 0:
+        return "View 1", None
+
+    # Parse current view number
+    try:
+        current_view = int(current_selector_value.split()[1]) - 1
+    except:  # noqa
+        current_view = 0
+
+    num_views = len(processed_data)
+    new_view = (current_view + direction) % num_views
+
+    new_selector_value = f"View {new_view + 1}"
+    feature_vis = update_feature_view(processed_data, new_view)
+
+    return new_selector_value, feature_vis
 
 
 def navigate_depth_view(processed_data, current_selector_value, direction):
@@ -361,14 +413,15 @@ def navigate_measure_view(processed_data, current_selector_value, direction):
 def populate_visualization_tabs(processed_data):
     """Populate the depth, normal, and measure tabs with processed data"""
     if processed_data is None or len(processed_data) == 0:
-        return None, None, None, []
+        return None, None, None, None, []
 
     # Use update functions to ensure confidence filtering is applied from the start
     depth_vis = update_depth_view(processed_data, 0)
     normal_vis = update_normal_view(processed_data, 0)
     measure_img, _ = update_measure_view(processed_data, 0)
+    feature_vis = update_feature_view(processed_data, 0)
 
-    return depth_vis, normal_vis, measure_img, []
+    return depth_vis, normal_vis, measure_img, feature_vis, []
 
 
 # -------------------------------------------------------------------------
@@ -507,6 +560,7 @@ def gradio_demo(
     conf_thres=3.0,
     apply_mask=True,
     show_mesh=True,
+    show_feat=False,
 ):
     """
     Perform reconstruction using the already-created target_dir/images.
@@ -555,6 +609,7 @@ def gradio_demo(
         mask_white_bg=filter_white_bg,
         as_mesh=show_mesh,  # Use the show_mesh parameter
         conf_percentile=conf_thres,
+        show_feat=show_feat,
     )
     glbscene.export(file_obj=glbfile)
 
@@ -570,12 +625,12 @@ def gradio_demo(
     )
 
     # Populate visualization tabs with processed data
-    depth_vis, normal_vis, measure_img, measure_pts = populate_visualization_tabs(
+    depth_vis, normal_vis, measure_img, feature_vis, measure_pts = populate_visualization_tabs(
         processed_data
     )
 
     # Update view selectors based on available views
-    depth_selector, normal_selector, measure_selector = update_view_selectors(
+    depth_selector, normal_selector, measure_selector, feature_selector = update_view_selectors(
         processed_data
     )
 
@@ -584,6 +639,7 @@ def gradio_demo(
         log_msg,
         gr.Dropdown(choices=frame_filter_choices, value=frame_filter, interactive=True),
         processed_data,
+        feature_vis,
         depth_vis,
         normal_vis,
         measure_img,
@@ -591,6 +647,7 @@ def gradio_demo(
         depth_selector,
         normal_selector,
         measure_selector,
+        feature_selector,
     )
 
 
@@ -650,6 +707,24 @@ def colorize_normal(normal_map, mask=None):
     return normal_vis
 
 
+def colorize_feature(feature_map, mask=None):
+    """Convert feature map to colorized visualization with optional mask"""
+    if feature_map is None:
+        return None
+
+    # Normalize feature map to 0-1 range
+    feat_vis = feature_map.copy()
+
+    # Apply additional mask if provided (for background filtering)
+    if mask is not None:
+        invalid_mask = ~mask
+        feat_vis[invalid_mask] = [0, 0, 0]  # Set invalid areas to zero
+
+    feat_vis = (feat_vis * 255).astype(np.uint8)
+
+    return feat_vis
+
+
 def process_predictions_for_visualization(
     predictions, views, high_level_config, filter_black_bg=False, filter_white_bg=False
 ):
@@ -664,6 +739,9 @@ def process_predictions_for_visualization(
         # Get predicted points
         pred_pts3d = predictions["world_points"][view_idx]
 
+        # Get feature visualization
+        feat_viz = predictions["feat_viz"][view_idx]
+
         # Initialize data for this view
         view_data = {
             "image": image[0],
@@ -671,6 +749,7 @@ def process_predictions_for_visualization(
             "depth": None,
             "normal": None,
             "mask": None,
+            "feat_viz": feat_viz,
         }
 
         # Start with the final mask from predictions
@@ -954,6 +1033,7 @@ def update_all_views_on_filter_change(
     depth_view_selector,
     normal_view_selector,
     measure_view_selector,
+    feature_view_selector,
 ):
     """
     Update all individual view tabs when background filtering checkboxes change.
@@ -1005,17 +1085,26 @@ def update_all_views_on_filter_change(
         except:  # noqa
             measure_view_idx = 0
 
+        try:
+            feature_view_idx = (
+                int(feature_view_selector.split()[1]) - 1
+                if feature_view_selector
+                else 0
+            )
+        except:  # noqa
+            feature_view_idx = 0
+
         # Update all views with new filtered data
         depth_vis = update_depth_view(new_processed_data, depth_view_idx)
         normal_vis = update_normal_view(new_processed_data, normal_view_idx)
         measure_img, _ = update_measure_view(new_processed_data, measure_view_idx)
+        feature_vis = update_feature_view(new_processed_data, feature_view_idx)
 
-        return new_processed_data, depth_vis, normal_vis, measure_img, []
+        return new_processed_data, depth_vis, normal_vis, measure_img, feature_vis, []
 
     except Exception as e:
         print(f"Error updating views on filter change: {e}")
-        return processed_data, None, None, None, []
-
+        return processed_data, None, None, None, None, []
 
 # -------------------------------------------------------------------------
 # Example scene functions
@@ -1144,6 +1233,24 @@ with gr.Blocks() as demo:
                             key="persistent_3d_viewer",
                             elem_id="reconstruction_3d_viewer",
                         )
+                    with gr.Tab("Feature"):
+                        with gr.Row(elem_classes=["navigation-row"]):
+                            prev_feature_btn = gr.Button("◀ Previous", size="sm", scale=1)
+                            feature_view_selector = gr.Dropdown(
+                                choices=["View 1"],
+                                value="View 1",
+                                label="Select View",
+                                scale=2,
+                                interactive=True,
+                                allow_custom_value=True,
+                            )
+                            next_feature_btn = gr.Button("Next ▶", size="sm", scale=1)
+                        feature_map = gr.Image(
+                            type="numpy",
+                            label="Adapter Feature Map",
+                            format="png",
+                            interactive=False,
+                        )
                     with gr.Tab("Depth"):
                         with gr.Row(elem_classes=["navigation-row"]):
                             prev_depth_btn = gr.Button("◀ Previous", size="sm", scale=1)
@@ -1240,6 +1347,7 @@ with gr.Blocks() as demo:
 
                     show_cam = gr.Checkbox(label="Show Camera", value=True)
                     show_mesh = gr.Checkbox(label="Show Mesh", value=True)
+                    show_feat = gr.Checkbox(label="Show Feature Points", value=False)
                     filter_black_bg = gr.Checkbox(
                         label="Filter Black Background", value=False
                     )
@@ -1318,12 +1426,14 @@ with gr.Blocks() as demo:
             conf_thres,
             apply_mask_checkbox,
             show_mesh,
+            show_feat,
         ],
         outputs=[
             reconstruction_output,
             log_output,
             frame_filter,
             processed_data_state,
+            feature_map,
             depth_map,
             normal_map,
             measure_image,
@@ -1331,6 +1441,7 @@ with gr.Blocks() as demo:
             depth_view_selector,
             normal_view_selector,
             measure_view_selector,
+            feature_view_selector,
         ],
     ).then(
         fn=lambda: "False",
@@ -1406,12 +1517,14 @@ with gr.Blocks() as demo:
             depth_view_selector,
             normal_view_selector,
             measure_view_selector,
+            feature_view_selector,
         ],
         outputs=[
             processed_data_state,
             depth_map,
             normal_map,
             measure_image,
+            feature_map,
             measure_points_state,
         ],
     )
@@ -1438,12 +1551,14 @@ with gr.Blocks() as demo:
             depth_view_selector,
             normal_view_selector,
             measure_view_selector,
+            feature_view_selector,
         ],
         outputs=[
             processed_data_state,
             depth_map,
             normal_map,
             measure_image,
+            feature_map,
             measure_points_state,
         ],
     )
@@ -1487,6 +1602,36 @@ with gr.Blocks() as demo:
     # -------------------------------------------------------------------------
     # Navigation functionality for Depth, Normal, and Measure tabs
     # -------------------------------------------------------------------------
+
+    # Feature tab navigation
+    prev_feature_btn.click(
+        fn=lambda processed_data, current_selector: navigate_feature_view(
+            processed_data, current_selector, -1
+        ),
+        inputs=[processed_data_state, feature_view_selector],
+        outputs=[feature_view_selector, feature_map],
+    )
+
+    next_feature_btn.click(
+        fn=lambda processed_data, current_selector: navigate_feature_view(
+            processed_data, current_selector, 1
+        ),
+        inputs=[processed_data_state, feature_view_selector],
+        outputs=[feature_view_selector, feature_map],
+    )
+
+    feature_view_selector.change(
+        fn=lambda processed_data, selector_value: (
+            update_depth_view(
+                processed_data,
+                int(selector_value.split()[1]) - 1,
+            )
+            if selector_value
+            else None
+        ),
+        inputs=[processed_data_state, feature_view_selector],
+        outputs=[feature_map],
+    )
 
     # Depth tab navigation
     prev_depth_btn.click(
