@@ -41,7 +41,7 @@ from mapanything.utils.misc import seed_everything
 from mapanything.utils.viz import predictions_to_glb
 
 # Configure CUDA settings (only if available)
-if hasattr(torch.backends, "cudnn"):
+if torch.cuda.is_available():
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = False

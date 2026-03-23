@@ -163,6 +163,8 @@ def empty_cache(device=None):
 
     if device_type == "cuda" and torch.cuda.is_available():
         torch.cuda.empty_cache()
+    elif device_type == "mps" and hasattr(torch, "mps"):
+        torch.mps.empty_cache()
 
 
 def get_amp_dtype(device, requested_dtype="bf16"):

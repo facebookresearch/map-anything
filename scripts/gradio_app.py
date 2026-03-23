@@ -14,13 +14,15 @@ import sys
 import time
 from datetime import datetime
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+import torch
+
+if torch.cuda.is_available():
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import cv2
 import gradio as gr
 import numpy as np
 import spaces
-import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 

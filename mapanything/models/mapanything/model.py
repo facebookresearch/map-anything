@@ -14,7 +14,11 @@ import torch
 import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
 
-from mapanything.utils.device import get_amp_dtype, get_autocast_device_type
+from mapanything.utils.device import (
+    empty_cache,
+    get_amp_dtype,
+    get_autocast_device_type,
+)
 from mapanything.utils.geometry import (
     apply_log_to_norm,
     convert_ray_dirs_depth_along_ray_pose_trans_quats_to_pointmap,
@@ -1306,7 +1310,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
 
         if device.type == "cuda":
             # Get available GPU memory
-            torch.cuda.empty_cache()
+            empty_cache(device)
             available_memory = torch.cuda.mem_get_info()[0]  # Free memory in bytes
             usable_memory = (
                 available_memory * memory_safety_factor
@@ -1476,9 +1480,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                     **pose_pred_data_dict
                 )
 
-            # Clear CUDA cache for better memory efficiency
-            if device.type == "cuda":
-                torch.cuda.empty_cache()
+            # Clear device cache for better memory efficiency
+            empty_cache(device)
         else:
             # Run prediction for all (batch_size * num_views) in one go
             # Dense prediction
@@ -1511,9 +1514,9 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         )
         scale_final_output = scale_final_output.value.squeeze(-1)  # (B, 1, 1) -> (B, 1)
 
-        # Clear CUDA cache for better memory efficiency
-        if memory_efficient_inference and device.type == "cuda":
-            torch.cuda.empty_cache()
+        # Clear device cache for better memory efficiency
+        if memory_efficient_inference:
+            empty_cache(device)
 
         return dense_final_outputs, pose_final_outputs, scale_final_output
 
