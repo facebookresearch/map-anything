@@ -7,7 +7,6 @@
 MapAnything model class defined using UniCeption modules.
 """
 
-import warnings
 from functools import partial
 from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
@@ -15,6 +14,11 @@ import torch
 import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
 
+from mapanything.utils.device import (
+    empty_cache,
+    get_amp_dtype,
+    get_autocast_device_type,
+)
 from mapanything.utils.geometry import (
     apply_log_to_norm,
     convert_ray_dirs_depth_along_ray_pose_trans_quats_to_pointmap,
@@ -1306,7 +1310,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
 
         if device.type == "cuda":
             # Get available GPU memory
-            torch.cuda.empty_cache()
+            empty_cache(device)
             available_memory = torch.cuda.mem_get_info()[0]  # Free memory in bytes
             usable_memory = (
                 available_memory * memory_safety_factor
@@ -1476,9 +1480,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                     **pose_pred_data_dict
                 )
 
-            # Clear CUDA cache for better memory efficiency
-            if device.type == "cuda":
-                torch.cuda.empty_cache()
+            # Clear device cache for better memory efficiency
+            empty_cache(device)
         else:
             # Run prediction for all (batch_size * num_views) in one go
             # Dense prediction
@@ -1511,9 +1514,9 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         )
         scale_final_output = scale_final_output.value.squeeze(-1)  # (B, 1, 1) -> (B, 1)
 
-        # Clear CUDA cache for better memory efficiency
-        if memory_efficient_inference and device.type == "cuda":
-            torch.cuda.empty_cache()
+        # Clear device cache for better memory efficiency
+        if memory_efficient_inference:
+            empty_cache(device)
 
         return dense_final_outputs, pose_final_outputs, scale_final_output
 
@@ -1559,7 +1562,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
 
         # Encode the optional geometric inputs and fuse with the encoded features from the N input views
         # Use high precision to prevent NaN values after layer norm in dense representation encoder (due to high variance in last dim of features)
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(get_autocast_device_type(self.device), enabled=False):
             all_encoder_features_across_views = (
                 self._encode_and_fuse_optional_geometric_inputs(
                     views, all_encoder_features_across_views
@@ -1645,7 +1648,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                 f"Invalid pred_head_type: {self.pred_head_type}. Valid options: ['linear', 'dpt', 'dpt+pose']"
             )
 
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(get_autocast_device_type(self.device), enabled=False):
             # Prepare inputs for the downstream heads
             if self.pred_head_type == "linear":
                 dense_head_inputs = dense_head_inputs
@@ -2105,18 +2108,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         """
         # Determine the mixed precision floating point type
         if use_amp:
-            if amp_dtype == "fp16":
-                amp_dtype = torch.float16
-            elif amp_dtype == "bf16":
-                if torch.cuda.is_bf16_supported():
-                    amp_dtype = torch.bfloat16
-                else:
-                    warnings.warn(
-                        "bf16 is not supported on this device. Using fp16 instead."
-                    )
-                    amp_dtype = torch.float16
-            elif amp_dtype == "fp32":
-                amp_dtype = torch.float32
+            amp_dtype = get_amp_dtype(self.device, amp_dtype)
         else:
             amp_dtype = torch.float32
 
@@ -2157,7 +2149,8 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
         )
 
         # Run the model
-        with torch.autocast("cuda", enabled=bool(use_amp), dtype=amp_dtype):
+        device_type = get_autocast_device_type(self.device)
+        with torch.autocast(device_type, enabled=bool(use_amp), dtype=amp_dtype):
             preds = self.forward(
                 processed_views,
                 memory_efficient_inference=memory_efficient_inference,

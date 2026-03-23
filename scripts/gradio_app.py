@@ -14,16 +14,19 @@ import sys
 import time
 from datetime import datetime
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+import torch
+
+if torch.cuda.is_available():
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import cv2
 import gradio as gr
 import numpy as np
 import spaces
-import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 
+from mapanything.utils.device import empty_cache, get_device
 from mapanything.utils.geometry import depthmap_to_world_frame, points_to_normals
 from mapanything.utils.hf_utils.css_and_html import (
     get_acknowledgements_html,
@@ -93,16 +96,14 @@ def run_model(
     filter_white_bg=False,
 ):
     """
-    Run the MapAnything model on images in the 'target_dir/images' folder and return predictions.
+    Run MapAnything model on images in 'target_dir/images' folder and return predictions.
     """
     global model
-    import torch  # Ensure torch is available in function scope
 
     print(f"Processing images from {target_dir}")
 
-    # Device check
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    device = torch.device(device)
+    # Device check (auto-detects CUDA > MPS > CPU)
+    device = get_device()
 
     # Initialize model if not already done
     if model is None:
@@ -118,7 +119,7 @@ def run_model(
     image_folder_path = os.path.join(target_dir, "images")
     views = load_images(image_folder_path)
 
-    print(f"Loaded {len(views)} images")
+    print(f"Loaded {len(views)} views")
     if len(views) == 0:
         raise ValueError("No images found. Check your upload.")
 
@@ -208,7 +209,7 @@ def run_model(
     )
 
     # Clean up
-    torch.cuda.empty_cache()
+    empty_cache(device)
 
     return predictions, processed_data
 
@@ -381,7 +382,7 @@ def handle_uploads(input_video, input_images, s_time_interval=1.0):
     """
     start_time = time.time()
     gc.collect()
-    torch.cuda.empty_cache()
+    empty_cache()
 
     # Create a unique folder name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -509,14 +510,14 @@ def gradio_demo(
     show_mesh=True,
 ):
     """
-    Perform reconstruction using the already-created target_dir/images.
+    Perform reconstruction using already-created target_dir/images.
     """
     if not os.path.isdir(target_dir) or target_dir == "None":
         return None, "No valid target directory found. Please upload first.", None, None
 
     start_time = time.time()
     gc.collect()
-    torch.cuda.empty_cache()
+    empty_cache()
 
     # Prepare frame_filter dropdown
     target_dir_images = os.path.join(target_dir, "images")
@@ -530,7 +531,10 @@ def gradio_demo(
 
     print("Running MapAnything model...")
     with torch.no_grad():
-        predictions, processed_data = run_model(target_dir, apply_mask)
+        predictions, processed_data = run_model(
+            target_dir,
+            apply_mask=apply_mask,
+        )
 
     # Save predictions
     prediction_save_path = os.path.join(target_dir, "predictions.npz")
@@ -561,7 +565,7 @@ def gradio_demo(
     # Cleanup
     del predictions
     gc.collect()
-    torch.cuda.empty_cache()
+    empty_cache()
 
     end_time = time.time()
     print(f"Total time: {end_time - start_time:.2f} seconds")
