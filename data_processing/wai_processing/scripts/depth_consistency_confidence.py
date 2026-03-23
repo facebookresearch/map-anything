@@ -11,6 +11,15 @@ from typing import Any, Optional
 
 import torch
 from argconf import argconf_parse
+from tqdm import tqdm
+from wai_processing.utils.covis_utils import (
+    compute_frustum_intersection,
+    load_scene_data,
+    project_points_to_views,
+    sample_depths_at_reprojections,
+)
+from wai_processing.utils.state import set_processing_state
+
 from mapanything.utils.device import get_device
 from mapanything.utils.wai.core import (
     get_frame,
@@ -20,14 +29,6 @@ from mapanything.utils.wai.core import (
     store_data,
 )
 from mapanything.utils.wai.scene_frame import get_scene_names
-from tqdm import tqdm
-from wai_processing.utils.covis_utils import (
-    compute_frustum_intersection,
-    load_scene_data,
-    project_points_to_views,
-    sample_depths_at_reprojections,
-)
-from wai_processing.utils.state import set_processing_state
 
 logger = logging.getLogger("covisibility-confidence")
 

@@ -15,7 +15,6 @@ import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin
 
 from mapanything.utils.device import get_amp_dtype, get_autocast_device_type
-
 from mapanything.utils.geometry import (
     apply_log_to_norm,
     convert_ray_dirs_depth_along_ray_pose_trans_quats_to_pointmap,

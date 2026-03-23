@@ -97,7 +97,6 @@ def run_model(
     Run MapAnything model on images in 'target_dir/images' folder and return predictions.
     """
     global model
-    import torch  # Ensure torch is available in function scope
 
     print(f"Processing images from {target_dir}")
 
