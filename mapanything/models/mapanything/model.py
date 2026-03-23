@@ -1560,7 +1560,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
 
         # Encode the optional geometric inputs and fuse with the encoded features from the N input views
         # Use high precision to prevent NaN values after layer norm in dense representation encoder (due to high variance in last dim of features)
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(get_autocast_device_type(self.device), enabled=False):
             all_encoder_features_across_views = (
                 self._encode_and_fuse_optional_geometric_inputs(
                     views, all_encoder_features_across_views
@@ -1646,7 +1646,7 @@ class MapAnything(nn.Module, PyTorchModelHubMixin):
                 f"Invalid pred_head_type: {self.pred_head_type}. Valid options: ['linear', 'dpt', 'dpt+pose']"
             )
 
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(get_autocast_device_type(self.device), enabled=False):
             # Prepare inputs for the downstream heads
             if self.pred_head_type == "linear":
                 dense_head_inputs = dense_head_inputs

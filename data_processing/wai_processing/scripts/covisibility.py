@@ -18,7 +18,7 @@ from wai_processing.utils.covis_utils import (
     load_scene_data,
     project_points_to_views,
     sample_depths_at_reprojections,
-    )
+)
 from wai_processing.utils.state import SceneProcessLock, set_processing_state
 
 from mapanything.utils.device import get_device

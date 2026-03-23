@@ -173,27 +173,25 @@ def get_amp_dtype(device, requested_dtype="bf16"):
         requested_dtype: str or torch.dtype - preferred dtype ('bf16', 'fp16', 'fp32')
 
     Returns:
-        tuple: (dtype_used: torch.dtype, dtype_name: str)
-                dtype_used is the actual torch.dtype that will be used
-                dtype_name is the string representation for logging
+        torch.dtype: The resolved dtype to use for mixed precision
     """
     if isinstance(requested_dtype, str):
         requested_dtype = requested_dtype.lower()
 
     if requested_dtype in ["fp32", "float32"]:
-        return torch.float32, "fp32"
+        return torch.float32
 
     capabilities = get_device_capabilities(device)
     if requested_dtype in ["bf16", "bfloat16"]:
         if capabilities["bf16_supported"]:
-            return torch.bfloat16, "bf16"
+            return torch.bfloat16
         else:
-            return torch.float16, "fp16"
+            return torch.float16
 
     if requested_dtype in ["fp16", "float16"]:
-        return torch.float16, "fp16"
+        return torch.float16
 
-    return torch.float32, "fp32"
+    return torch.float32
 
 
 def get_autocast_device_type(device):

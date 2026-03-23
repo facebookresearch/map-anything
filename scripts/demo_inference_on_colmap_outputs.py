@@ -33,6 +33,7 @@ from PIL import Image
 from mapanything.models import MapAnything
 from mapanything.utils.colmap import get_camera_matrix, qvec2rotmat, read_model
 from mapanything.utils.colmap_export import export_predictions_to_colmap
+from mapanything.utils.device import get_device
 from mapanything.utils.geometry import closed_form_pose_inverse, depthmap_to_world_frame
 from mapanything.utils.image import preprocess_inputs
 from mapanything.utils.viz import predictions_to_glb, script_add_rerun_args

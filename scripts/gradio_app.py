@@ -24,7 +24,7 @@ import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from mapanything.utils.device import get_device, is_memory_query_supported
+from mapanything.utils.device import empty_cache, get_device
 from mapanything.utils.geometry import depthmap_to_world_frame, points_to_normals
 from mapanything.utils.hf_utils.css_and_html import (
     get_acknowledgements_html,
@@ -208,8 +208,7 @@ def run_model(
     )
 
     # Clean up
-    if is_memory_query_supported(device):
-        torch.cuda.empty_cache()
+    empty_cache(device)
 
     return predictions, processed_data
 
@@ -382,9 +381,7 @@ def handle_uploads(input_video, input_images, s_time_interval=1.0):
     """
     start_time = time.time()
     gc.collect()
-    local_device = get_device()
-    if is_memory_query_supported(local_device):
-        torch.cuda.empty_cache()
+    empty_cache()
 
     # Create a unique folder name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -519,9 +516,7 @@ def gradio_demo(
 
     start_time = time.time()
     gc.collect()
-    local_device = get_device()
-    if is_memory_query_supported(local_device):
-        torch.cuda.empty_cache()
+    empty_cache()
 
     # Prepare frame_filter dropdown
     target_dir_images = os.path.join(target_dir, "images")
@@ -536,16 +531,7 @@ def gradio_demo(
     print("Running MapAnything model...")
     with torch.no_grad():
         predictions, processed_data = run_model(
-            target_dir, 
-            apply_mask=apply_mask,
-        )
-    all_files = [f"{i}: {filename}" for i, filename in enumerate(all_files)]
-    frame_filter_choices = ["All"] + all_files
-
-    print("Running MapAnything model...")
-    with torch.no_grad():
-        predictions, processed_data = run_model(
-            target_dir, 
+            target_dir,
             apply_mask=apply_mask,
         )
 
@@ -578,9 +564,7 @@ def gradio_demo(
     # Cleanup
     del predictions
     gc.collect()
-    local_device = get_device()
-    if is_memory_query_supported(local_device):
-        torch.cuda.empty_cache()
+    empty_cache()
 
     end_time = time.time()
     print(f"Total time: {end_time - start_time:.2f} seconds")
@@ -1139,6 +1123,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                 label="Preview",
                 columns=4,
                 height="300px",
+                show_download_button=True,
                 object_fit="contain",
                 preview=True,
             )
