@@ -24,7 +24,7 @@ dependencies = [
     "tensorboard",
     "tqdm",
     "trimesh",
-    "uniception==0.1.6",
+    "uniception==0.1.7",
 ]
 
 [project.optional-dependencies]
