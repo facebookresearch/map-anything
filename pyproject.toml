@@ -35,7 +35,7 @@ colmap = [
     "open3d",
     "pycolmap==3.10.0"
 ]
-gradio = ["gradio==5.47.2", "spaces"]
+gradio = ["gradio==6.7.0", "spaces"]
 radio = ["timm"]
 # External models for benchmarking
 anycalib = ["anycalib @ git+https://github.com/javrtg/AnyCalib.git@main#egg=anycalib"]
