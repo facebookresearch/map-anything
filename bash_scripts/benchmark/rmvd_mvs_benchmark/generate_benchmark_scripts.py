@@ -45,6 +45,15 @@ def get_model_settings(model: str, dataset: str):
                 else "\\${dataset.resolution_options.518_3_20_ar}"
             ),
         }
+    elif model == "vggt_omega":
+        return {
+            "model": "vggt_omega",
+            "evaluation_resolution": (
+                "\\${dataset.resolution_options.512_1_33_ar}"
+                if dataset != "kitti"
+                else "\\${dataset.resolution_options.512_3_20_ar}"
+            ),
+        }
     elif model == "must3r":
         return {
             "model": "must3r",
@@ -94,7 +103,7 @@ def generate_shell_for_single_experiment(
     os.makedirs(os.path.dirname(shell_output_path), exist_ok=True)
 
     # write the content to the file
-    with open(shell_output_path, "w") as f:
+    with open(shell_output_path, "w", encoding="utf-8") as f:
         f.write(file_content)
 
     # change the file permission to make it executable
@@ -163,6 +172,7 @@ if __name__ == "__main__":
             "moge_1",
             "moge_2",
             "vggt",
+            "vggt_omega",
             "mapanything",
         ]:
             generate_shell_for_single_experiment(
@@ -185,7 +195,7 @@ if __name__ == "__main__":
     # generate multi view with alignment experiments
     for dataset in ["kitti", "scannet"]:
         # non-conditioned
-        for model in ["vggt", "mapanything", "must3r"]:
+        for model in ["vggt", "vggt_omega", "mapanything", "must3r"]:
             generate_shell_for_single_experiment(
                 model=model,
                 dataset=dataset,

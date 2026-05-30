@@ -834,7 +834,7 @@ def _load_mmap(fname: str | Path, **kwargs) -> np.memmap:
         It uses this information to create a memory-mapped array with the correct shape.
     """
     shape_string = Path(Path(fname).name.split("--")[1]).stem
-    shape = [int(dim) for dim in shape_string.replace(",", "x").split("x")]
+    shape = tuple(int(dim) for dim in shape_string.replace(",", "x").split("x"))
     with open(fname, "rb") as fid:
         return np.memmap(fid, dtype=np.float32, mode="r", shape=shape, offset=128)
 

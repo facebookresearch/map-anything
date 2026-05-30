@@ -19,7 +19,7 @@ Example usage:
     # Compare with external models
     python scripts/profile_memory_runtime.py \
         --output_dir /path/to/results \
-        --external_models vggt pi3x must3r
+        --external_models vggt vggt_omega pi3x must3r
 
     # Custom view counts
     python scripts/profile_memory_runtime.py \
@@ -77,6 +77,7 @@ METHOD_COLORS = {
     "mapanything_v1": COLOR_PALETTES["gray"],
     "mapanything_v1_mem_efficient": "#C0C0C0",
     "vggt": COLOR_PALETTES["purple"],
+    "vggt_omega": "#4B0082",
     "pi3": COLOR_PALETTES["red"],
     "pi3x": "#800000",  # Maroon
     "dust3r": COLOR_PALETTES["blue"],
@@ -97,6 +98,7 @@ METHOD_NAMES = {
     "mapanything_v1": "MapAnything V1",
     "mapanything_v1_mem_efficient": "MapAnything V1 (Mem Efficient)",
     "vggt": "VGGT",
+    "vggt_omega": "VGGT-Omega",
     "pi3": r"$\pi^3$",
     "pi3x": r"$\pi^3$-X",
     "dust3r": "DUSt3R-BA",
@@ -205,6 +207,7 @@ MODEL_CONFIG = {
     "mapanything_v1": {"resolution": 518, "norm_type": "dinov2", "patch_size": 14},
     "vggt": {"resolution": 518, "norm_type": "identity", "patch_size": 14},
     "vggt_commercial": {"resolution": 518, "norm_type": "identity", "patch_size": 14},
+    "vggt_omega": {"resolution": 512, "norm_type": "identity", "patch_size": 16},
     "pi3": {"resolution": 518, "norm_type": "identity", "patch_size": 14},
     "pi3x": {"resolution": 518, "norm_type": "identity", "patch_size": 14},
     "dust3r": {"resolution": 512, "norm_type": "dust3r", "patch_size": 16},
@@ -907,7 +910,7 @@ def parse_args():
         type=str,
         nargs="*",
         default=[],
-        help="External model names to compare (e.g., vggt pi3x must3r). "
+        help="External model names to compare (e.g., vggt vggt_omega pi3x must3r). "
         "Models are loaded from configs/model/<name>.yaml",
     )
 

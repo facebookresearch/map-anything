@@ -102,6 +102,8 @@ def run_benchmark(args):
         print(model.load_state_dict(ckpt["model"], strict=False))
         del ckpt  # in case it occupies memory
 
+    model.eval()
+
     # Wrap the pretrained model with RMVD Wrapper to work with its benchmark
     wrapped_model = RMVD_MAPA_Wrapper(
         name=args.model.model_str,

@@ -364,6 +364,8 @@ def benchmark(args):
         print(model.load_state_dict(ckpt["model"], strict=False))
         del ckpt  # in case it occupies memory
 
+    model.eval()
+
     # Create dictionary to keep track of the results across different benchmarking datasets
     per_dataset_results = {}
 

@@ -197,6 +197,10 @@ MODEL_CONFIGS = {
         "module": "mapanything.models.external.vggt",
         "class_name": "VGGTWrapper",
     },
+    "vggt_omega": {
+        "module": "mapanything.models.external.vggt_omega",
+        "class_name": "VGGTOmegaWrapper",
+    },
     # Add other model classes here
     "pixio": {
         "class": MapAnything,

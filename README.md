@@ -118,7 +118,7 @@ conda activate mapanything
 pip install -e .
 
 # For all optional dependencies
-# This includes external model support (VGGT, DUSt3R, MASt3R, MUSt3R, Pi3-X, DA3, etc.)
+# This includes external model support (VGGT, VGGT-Omega, DUSt3R, MASt3R, MUSt3R, Pi3-X, DA3, etc.)
 # See "Running External Models" section for more details
 # See pyproject.toml for more details on installed packages
 pip install -e ".[all]"
@@ -404,6 +404,7 @@ The MapAnything codebase is **modular** — different 3D reconstruction models c
 | `mapanything_ablations` | MapAnything ablations | 518 | `dinov2` | (base) |
 | `modular_dust3r` | ModularDUSt3R | 512 | `dust3r` | (base) |
 | `vggt` | VGGT 1B | 518 | `identity` | (base) |
+| `vggt_omega` | VGGT-Omega 1B | 512 | `identity` | `vggt-omega` |
 | `dust3r` | DUSt3R + Global BA | 512 | `dust3r` | `dust3r` |
 | `mast3r` | MASt3R + SGA | 512 | `dust3r` | `mast3r` |
 | `moge` | MoGe | 518 | `identity` | (base) |
@@ -427,6 +428,7 @@ pip install -e ".[pi3]"              # π³-X (note: π³ base works without thi
 pip install -e ".[pow3r]"            # Pow3R
 pip install -e ".[anycalib]"         # AnyCalib
 pip install -e ".[must3r]"           # MUSt3R
+pip install -e ".[vggt-omega]"       # VGGT-Omega
 pip install -e ".[depth-anything-3]" # Depth Anything 3
 
 # Or install all external model dependencies
@@ -446,9 +448,10 @@ from mapanything.models import init_model_from_config
 model = init_model_from_config("vggt", device="cuda")
 
 # Other examples:
+# model = init_model_from_config("vggt_omega", device="cuda")
 # model = init_model_from_config("pi3x", device="cuda")
 # model = init_model_from_config("da3_nested", device="cuda")
-# Note: For MUSt3R, the values in configs/machine/default.yaml need to be populated to enable checkpoint loading
+# Note: For MUSt3R and VGGT-Omega, the values in configs/machine/default.yaml need to be populated to enable checkpoint loading
 # model = init_model_from_config("must3r", device="cuda")
 ```
 
@@ -461,7 +464,7 @@ from mapanything.models import model_factory, get_available_models
 print(get_available_models())
 # ['mapanything', 'mapanything_ablations', 'modular_dust3r', 'anycalib',
 #  'da3', 'dust3r', 'mast3r', 'moge', 'must3r', 'pi3', 'pi3x', 'pow3r',
-#  'pow3r_ba', 'vggt']
+#  'pow3r_ba', 'vggt', 'vggt_omega']
 
 # Initialize external model
 # Requires passing in additional model config arguments as kwargs
@@ -524,12 +527,12 @@ Different models have different input requirements:
 
 **Resolution - Longest Side**:
 - 518px: MapAnything, VGGT, MoGe, Pi3, Pi3X
-- 512px: DUSt3R, MASt3R, MUSt3R, Pow3R
+- 512px: VGGT-Omega, DUSt3R, MASt3R, MUSt3R, Pow3R
 - 504px: Depth Anything 3
 
 **Data Normalization (`data_norm_type`)**:
 - `dinov2`: MapAnything, Depth Anything 3
-- `identity`: VGGT, MoGe, Pi3, Pi3X
+- `identity`: VGGT, VGGT-Omega, MoGe, Pi3, Pi3X
 - `dust3r`: DUSt3R, MASt3R, MUSt3R, Pow3R
 
 For training and fine-tuning external models, see the [Training README](train.md) for detailed instructions.
@@ -661,7 +664,7 @@ External models are loaded using their Hydra config files from `configs/model/<m
 # Compare MapAnything with external models
 python scripts/profile_memory_runtime.py \
     --output_dir /path/to/results \
-    --external_models vggt pi3x must3r
+    --external_models vggt vggt_omega pi3x must3r
 
 # Custom view counts
 python scripts/profile_memory_runtime.py \
@@ -779,7 +782,7 @@ We provide comprehensive training instructions, scripts, and configurations to r
 - Data setup and processing for all 13 training datasets used in the paper
 - Quick start examples with memory optimization tips
 - All main model and ablation training scripts from the paper
-- Fine-tuning support for other geometry estimation models like MoGe-2, VGGT, π³ showcasing the modularity of our framework
+- Fine-tuning support for other geometry estimation models like MoGe-2, VGGT, VGGT-Omega, π³ showcasing the modularity of our framework
 
 ## Benchmarking
 

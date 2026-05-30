@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mapanything"
-version = "1.1"
+version = "1.1.2"
 description = "Universal Feed-Forward Metric 3D Reconstruction"
 readme = "readme.md"
 authors = [{ name = "Nikhil Keetha", email = "keethanikhil@gmail.com" }]
@@ -47,6 +47,7 @@ mast3r = ["mast3r @ git+https://github.com/Nik-V9/mast3r.git@main#egg=mast3r"]
 must3r = ["must3r @ git+https://github.com/naver/must3r.git@main#egg=must3r"]
 pi3 = ["pi3 @ git+https://github.com/yyfz/Pi3.git@main#egg=pi3"]
 pow3r = ["pow3r @ git+https://github.com/Nik-V9/pow3r.git@main#egg=pow3r"]
+vggt-omega = ["vggt-omega @ git+https://github.com/facebookresearch/vggt-omega.git@main#egg=vggt-omega"]
 depth-anything-3 = ["depth-anything-3 @ git+https://github.com/Nik-V9/depth-anything-3.git@main#egg=depth-anything-3"]
 rmvd = ["rmvd @ git+https://github.com/infinity1096/robustmvd.git@master#egg=rmvd"]
 
@@ -65,6 +66,7 @@ all = [
     "mapanything[pow3r]",
     "mapanything[radio]",
     "mapanything[rmvd]",
+    "mapanything[vggt-omega]",
 ]
 
 # Setuptools configuration

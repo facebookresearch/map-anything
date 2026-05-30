@@ -243,6 +243,8 @@ def benchmark(args):
         print(model.load_state_dict(ckpt["model"], strict=False))
         del ckpt  # in case it occupies memory
 
+    model.eval()
+
     # Warn user that the benchmarking assumes global pointmaps are predicted in view0 frame
     warnings.warn(
         "Assumes global pointmaps are predicted in view0 frame. Please ensure this is the case."
