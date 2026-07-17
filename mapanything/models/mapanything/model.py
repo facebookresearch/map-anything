@@ -92,6 +92,17 @@ if hasattr(torch.backends.cuda, "matmul") and hasattr(
 class MapAnything(nn.Module, PyTorchModelHubMixin):
     "Modular MapAnything model class that supports input of images & optional geometric modalities (multiple reconstruction tasks)."
 
+    @classmethod
+    def _from_pretrained(cls, **kwargs):
+        """Load a full checkpoint without first fetching redundant encoder weights."""
+        encoder_config = kwargs.get("encoder_config")
+        if encoder_config is not None and encoder_config.get("encoder_str") == "dinov2":
+            encoder_config = encoder_config.copy()
+            encoder_config["torch_hub_pretrained"] = False
+            kwargs["encoder_config"] = encoder_config
+
+        return super()._from_pretrained(**kwargs)
+
     def __init__(
         self,
         name: str,
