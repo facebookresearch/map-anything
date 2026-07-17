@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mapanything"
-version = "1.1.2"
+version = "1.1.3"
 description = "Universal Feed-Forward Metric 3D Reconstruction"
 readme = "readme.md"
 authors = [{ name = "Nikhil Keetha", email = "keethanikhil@gmail.com" }]
