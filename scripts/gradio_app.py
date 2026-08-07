@@ -36,7 +36,10 @@ from mapanything.utils.hf_utils.css_and_html import (
     GRADIO_CSS,
     MEASURE_INSTRUCTIONS_HTML,
 )
-from mapanything.utils.hf_utils.hf_helpers import initialize_mapanything_model
+from mapanything.utils.hf_utils.hf_helpers import (
+    initialize_mapanything_model,
+    load_prediction_archive,
+)
 from mapanything.utils.hf_utils.viz import predictions_to_glb
 from mapanything.utils.image import load_images, rgb
 
@@ -925,8 +928,13 @@ def update_visualization(
             f"No reconstruction available at {predictions_path}. Please run 'Reconstruct' first.",
         )
 
-    loaded = np.load(predictions_path, allow_pickle=True)
-    predictions = {key: loaded[key] for key in loaded.keys()}
+    try:
+        predictions = load_prediction_archive(predictions_path)
+    except ValueError:
+        return (
+            gr.update(),
+            "Saved reconstruction could not be loaded safely. Please click Reconstruct again.",
+        )
 
     glbfile = os.path.join(
         target_dir,
@@ -973,8 +981,7 @@ def update_all_views_on_filter_change(
 
     try:
         # Load the original predictions and views
-        loaded = np.load(predictions_path, allow_pickle=True)
-        predictions = {key: loaded[key] for key in loaded.keys()}
+        predictions = load_prediction_archive(predictions_path)
 
         # Load images using MapAnything's load_images function
         image_folder_path = os.path.join(target_dir, "images")
@@ -1102,7 +1109,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     gr.HTML(get_header_html(get_logo_base64()))
     gr.HTML(get_description_html())
 
-    target_dir_output = gr.Textbox(label="Target Dir", visible=False, value="None")
+    target_dir_state = gr.State(value=None)
 
     with gr.Row():
         with gr.Column(scale=2):
@@ -1223,7 +1230,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                         input_images,
                         reconstruction_output,
                         log_output,
-                        target_dir_output,
+                        target_dir_state,
                         image_gallery,
                     ],
                     scale=1,
@@ -1294,7 +1301,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
                                 fn=lambda name=scene["name"]: load_example_scene(name),
                                 outputs=[
                                     reconstruction_output,
-                                    target_dir_output,
+                                    target_dir_state,
                                     image_gallery,
                                     log_output,
                                 ],
@@ -1316,7 +1323,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     ).then(
         fn=gradio_demo,
         inputs=[
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             filter_black_bg,
@@ -1350,7 +1357,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     frame_filter.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1364,7 +1371,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     show_cam.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1378,7 +1385,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     conf_thres.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1392,7 +1399,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     filter_black_bg.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1405,7 +1412,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     ).then(
         fn=update_all_views_on_filter_change,
         inputs=[
-            target_dir_output,
+            target_dir_state,
             filter_black_bg,
             filter_white_bg,
             processed_data_state,
@@ -1424,7 +1431,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     filter_white_bg.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1437,7 +1444,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     ).then(
         fn=update_all_views_on_filter_change,
         inputs=[
-            target_dir_output,
+            target_dir_state,
             filter_black_bg,
             filter_white_bg,
             processed_data_state,
@@ -1456,7 +1463,7 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     show_mesh.change(
         update_visualization,
         [
-            target_dir_output,
+            target_dir_state,
             frame_filter,
             show_cam,
             is_example,
@@ -1473,12 +1480,12 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     input_video.change(
         fn=update_gallery_on_upload,
         inputs=[input_video, input_images, s_time_interval],
-        outputs=[reconstruction_output, target_dir_output, image_gallery, log_output],
+        outputs=[reconstruction_output, target_dir_state, image_gallery, log_output],
     )
     input_images.change(
         fn=update_gallery_on_upload,
         inputs=[input_video, input_images, s_time_interval],
-        outputs=[reconstruction_output, target_dir_output, image_gallery, log_output],
+        outputs=[reconstruction_output, target_dir_state, image_gallery, log_output],
     )
 
     # -------------------------------------------------------------------------
@@ -1586,4 +1593,4 @@ with gr.Blocks(theme=theme, css=GRADIO_CSS) as demo:
     # -------------------------------------------------------------------------
     gr.HTML(get_acknowledgements_html())
 
-    demo.queue(max_size=20).launch(show_error=True, share=True, ssr_mode=False)
+    demo.queue(max_size=20).launch(show_error=True, share=False, ssr_mode=False)

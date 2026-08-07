@@ -10,6 +10,14 @@ Helper functions for HuggingFace integration and model initialization.
 import json
 import os
 
+import numpy as np
+
+
+def load_prediction_archive(predictions_path):
+    """Load a prediction archive without allowing pickled object arrays."""
+    with np.load(predictions_path, allow_pickle=False) as loaded:
+        return {key: loaded[key] for key in loaded.files}
+
 
 def load_hf_token():
     """Load HuggingFace access token from local file"""
