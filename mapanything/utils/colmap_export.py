@@ -307,6 +307,10 @@ def build_colmap_reconstruction(
 
     # Create reconstruction
     reconstruction = pycolmap.Reconstruction()
+    # pycolmap migrated images to the rig/frame model incrementally in 3.12-4.0.
+    # Detect the available operations instead of relying on a version string.
+    uses_rig_frames = hasattr(reconstruction, "add_frame")
+    has_trivial_frame_helpers = hasattr(reconstruction, "add_image_with_trivial_frame")
 
     # Add 3D points with empty tracks (will be populated later)
     for point_idx in range(num_points):
@@ -330,7 +334,14 @@ def build_colmap_reconstruction(
             params=cam_params,
             camera_id=frame_idx + 1,
         )
-        reconstruction.add_camera(camera)
+        if has_trivial_frame_helpers:
+            reconstruction.add_camera_with_trivial_rig(camera)
+        else:
+            reconstruction.add_camera(camera)
+            if uses_rig_frames:
+                rig = pycolmap.Rig(rig_id=camera.camera_id)
+                rig.add_ref_sensor(camera.sensor_id)
+                reconstruction.add_rig(rig)
 
         # Create image with pose
         ext = extrinsics[frame_idx]  # (3, 4)
@@ -339,12 +350,18 @@ def build_colmap_reconstruction(
             ext[:3, 3],
         )
 
-        image = pycolmap.Image(
-            id=frame_idx + 1,
-            name=image_names[frame_idx],
-            camera_id=camera.camera_id,
-            cam_from_world=cam_from_world,
-        )
+        image_kwargs = {
+            "name": image_names[frame_idx],
+            "camera_id": camera.camera_id,
+        }
+        if uses_rig_frames:
+            image = pycolmap.Image(image_id=frame_idx + 1, **image_kwargs)
+        else:
+            image = pycolmap.Image(
+                id=frame_idx + 1,
+                cam_from_world=cam_from_world,
+                **image_kwargs,
+            )
 
         # Build Point2D list and update tracks
         points2d_list = []
@@ -359,17 +376,44 @@ def build_colmap_reconstruction(
             track.add_element(frame_idx + 1, point2d_idx)
 
         # Set points2D on image
+        image_registered = True
         if points2d_list:
             try:
-                image.points2D = pycolmap.ListPoint2D(points2d_list)
-                image.registered = True
-            except Exception as e:
+                point2d_list_type = getattr(pycolmap, "Point2DList", None)
+                if point2d_list_type is None:
+                    point2d_list_type = pycolmap.ListPoint2D
+                image.points2D = point2d_list_type(points2d_list)
+            except (RuntimeError, TypeError, ValueError) as e:
                 print(f"Warning: Failed to set points2D for frame {frame_idx}: {e}")
-                image.registered = False
-        else:
-            image.registered = True  # Still registered, just no observations
+                image_registered = False
 
-        reconstruction.add_image(image)
+        if has_trivial_frame_helpers and image_registered:
+            reconstruction.add_image_with_trivial_frame(image, cam_from_world)
+        elif uses_rig_frames:
+            frame = pycolmap.Frame(
+                frame_id=frame_idx + 1,
+                rig_id=camera.camera_id,
+            )
+            frame.add_data_id(image.data_id)
+            reconstruction.add_frame(frame)
+            reconstruction.frames[frame.frame_id].set_cam_from_world(
+                camera.camera_id, cam_from_world
+            )
+            image.frame_id = frame.frame_id
+            reconstruction.add_image(image)
+            if image_registered:
+                if hasattr(reconstruction, "register_frame"):
+                    reconstruction.register_frame(frame.frame_id)
+                else:
+                    reconstruction.register_image(image.image_id)
+        else:
+            if hasattr(image, "registered"):
+                image.registered = image_registered
+            reconstruction.add_image(image)
+            if not image_registered and reconstruction.is_image_registered(
+                image.image_id
+            ):
+                reconstruction.deregister_image(image.image_id)
 
     # Print summary
     total_observations = sum(len(obs) for obs in observations_per_frame)

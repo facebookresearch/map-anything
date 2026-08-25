@@ -33,7 +33,7 @@ dev = ["pre-commit", "pytest", "pytest-cov", "ruff"]
 colmap = [
     "lightglue @ git+https://github.com/cvg/LightGlue.git",
     "open3d",
-    "pycolmap==3.10.0"
+    "pycolmap>=3.10.0,<5"
 ]
 gradio = ["gradio==5.47.2", "spaces"]
 radio = ["timm"]
