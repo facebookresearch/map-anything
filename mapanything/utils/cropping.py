@@ -265,11 +265,13 @@ def rescale_image_and_other_optional_info(
             )
         additional_quantities_to_be_resized_with_nearest = resized_additional_quantities
 
-    # No offset here; simple rescaling
+    # Integer output dimensions can give each axis a different realized scale.
+    # Convert pixel centers before scaling, then restore OpenCV's convention.
     if camera_intrinsics is not None:
-        camera_intrinsics = camera_matrix_of_crop(
-            camera_intrinsics, input_resolution, output_resolution, scaling=scale_final
-        )
+        scale_xy = output_resolution / input_resolution
+        camera_intrinsics = opencv_to_colmap_intrinsics(camera_intrinsics)
+        camera_intrinsics[:2, :] *= scale_xy[:, None]
+        camera_intrinsics = colmap_to_opencv_intrinsics(camera_intrinsics)
 
     # Return
     return (
