@@ -101,7 +101,13 @@ def compute_covisibility(cfg, scene_name: str, overwrite=False):
             if valid_mask.any():
                 # Sample depths at reprojected points
                 depth_lu, expected_depth = sample_depths_at_reprojections(
-                    reprojected_pts, depths, ov_inds_chunk, depth_h, depth_w, device
+                    reprojected_pts,
+                    depths,
+                    ov_inds_chunk,
+                    depth_h,
+                    depth_w,
+                    device,
+                    window=cfg.get("sparse_lookup_window", 1),
                 )
                 # Calculate reprojection error and depth association threshold
                 reprojection_error = torch.abs(expected_depth - depth_lu)

@@ -1,0 +1,26 @@
+root:  # needs to be set via argument: root=<wai_dataset_root_path>
+
+out_path: covisibility/v0 # to enable some simple versioning
+
+scene_filters:
+  - exists: scene_meta.json
+  - process_state_not: [covisibility, finished]
+
+frame_modalities: # what to load for each frame
+  - depth|rendered_depth
+
+key_remap:
+  rendered_depth: depth
+
+# for sparse ground truth depth (e.g. projected LiDAR in KITTI, Waymo)
+sparse_depth: True # resize depth with a masked min-pool instead of nearest, so that sparse points are kept
+# downscale_factor: 4 # scale depth images down by this factor
+sparse_lookup_window: 3 # match a reprojected point against the closest valid target depth in a 3x3 window, since most reprojections land on empty pixels
+target_size: [224, 224] # (height, width) of resized depth; a fixed size also works for scenes with mixed orientations (e.g. ETH3D portrait + landscape)
+depth_assoc_error_thres: 0.1 # maximum depth distance for points to be considered a match
+depth_assoc_error_temp: 0.1 # depth association error temperature; helps with far points
+depth_assoc_rel_error_thres: 0.005 # relative depth association error; helps with far points
+denominator_mode: valid_target_depth # "full" caps the score at the fraction of pixels with depth
+
+batch_size: 4
+num_workers: 4

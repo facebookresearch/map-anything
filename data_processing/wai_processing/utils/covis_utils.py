@@ -23,6 +23,46 @@ from mapanything.utils.wai.ops import resize
 logger = logging.getLogger("covis_utils")
 
 
+def resize_sparse_depth(
+    depth: torch.Tensor,
+    scale: Optional[float] = None,
+    size: Optional[Any] = None,
+) -> torch.Tensor:
+    """Resize sparse depth maps (e.g. projected LiDAR) with a masked min-pool.
+
+    Each output pixel gets the minimum of the valid (> 0) input depths that fall
+    into it, or 0 if there are none. Nearest resizing would drop most of the
+    sparse points and leave almost no valid pixels at low resolution.
+
+    Args:
+        depth: Depth maps (B, H, W), dense or nested tensor
+        scale: Scale factor to apply to the original dimensions
+        size: Target size as (height, width) or int for long-side scaling
+
+    Returns:
+        Resized depth maps (B, out_h, out_w)
+    """
+    resized = []
+    for d in depth:
+        h, w = d.shape
+        if scale is not None:
+            out_h, out_w = int(h * scale), int(w * scale)
+        elif isinstance(size, int):
+            if h > w:
+                out_h, out_w = size, int(w * size / h)
+            else:
+                out_h, out_w = int(h * size / w), size
+        else:
+            out_h, out_w = size
+        ys, xs = torch.nonzero(d > 0, as_tuple=True)
+        out_inds = (ys * out_h // h) * out_w + (xs * out_w // w)
+        out = torch.full((out_h * out_w,), float("inf"), device=d.device)
+        out.scatter_reduce_(0, out_inds, d[ys, xs], reduce="amin")
+        out[torch.isinf(out)] = 0
+        resized.append(out.view(out_h, out_w))
+    return torch.stack(resized)
+
+
 def load_scene_data(cfg: Any, scene_name: str, device: str) -> Dict[str, Any]:
     """Load and preprocess scene data.
 
@@ -84,7 +124,10 @@ def load_scene_data(cfg: Any, scene_name: str, device: str) -> Dict[str, Any]:
 
         # Rescale depth maps if needed
         if scale or size:
-            depth = resize(depth, scale=scale, size=size, modality_format="depth")
+            if cfg.get("sparse_depth", False):
+                depth = resize_sparse_depth(depth, scale=scale, size=size)
+            else:
+                depth = resize(depth, scale=scale, size=size, modality_format="depth")
             if depth_confidences is not None:
                 depth_confidences = resize(
                     depth_confidences,
@@ -284,6 +327,7 @@ def sample_depths_at_reprojections(
     depth_h: int,
     depth_w: int,
     device: str,
+    window: int = 1,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Sample depths at reprojected points.
 
@@ -294,26 +338,41 @@ def sample_depths_at_reprojections(
         depth_h: Height of depth maps
         depth_w: Width of depth maps
         device: Device to use for computation
+        window: Size of the lookup window. If > 1, take the valid depth in the
+            window x window neighborhood that is closest to the expected depth
+            (for sparse depth, where most reprojections land on empty pixels)
 
     Returns:
         Tuple containing:
         - depth_lu: Sampled depth values
         - expected_depth: Expected depth values at reprojected points
     """
-    # Sample depths at reprojected points
-    normalized_pts = (
-        2
-        * reprojected_pts[..., [1, 0]]
-        / torch.tensor([depth_w - 1, depth_h - 1], device=device)
-        - 1
-    )
-    normalized_pts = torch.clamp(normalized_pts, min=-1.0, max=1.0)
-    depth_lu = F.grid_sample(
-        depths[ov_inds].unsqueeze(1),
-        normalized_pts,
-        mode="nearest",
-        align_corners=True,
-    )[:, 0]
     expected_depth = reprojected_pts[..., 2]
+    target_depths = depths[ov_inds].unsqueeze(1)
+    pts_xy = reprojected_pts[..., [1, 0]]
+    image_size = torch.tensor([depth_w - 1, depth_h - 1], device=device)
+
+    # Sample depths at reprojected points (and their neighbors if window > 1)
+    depth_lu = None
+    r = window // 2
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            offset = torch.tensor([dx, dy], device=device)
+            normalized_pts = 2 * (pts_xy + offset) / image_size - 1
+            normalized_pts = torch.clamp(normalized_pts, min=-1.0, max=1.0)
+            lu = F.grid_sample(
+                target_depths,
+                normalized_pts,
+                mode="nearest",
+                align_corners=True,
+            )[:, 0]
+            if depth_lu is None:
+                depth_lu = lu
+            else:
+                closer = (lu > 0) & (
+                    (depth_lu <= 0)
+                    | ((lu - expected_depth).abs() < (depth_lu - expected_depth).abs())
+                )
+                depth_lu = torch.where(closer, lu, depth_lu)
 
     return depth_lu, expected_depth
