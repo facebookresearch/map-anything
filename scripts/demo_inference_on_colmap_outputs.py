@@ -93,10 +93,14 @@ def load_colmap_data(colmap_path, stride=1, verbose=False, ext=".bin"):
         )
 
     # Get list of available image files
+    # COLMAP image names are paths relative to the images folder and may
+    # include subfolders (e.g. "cam0/frame_0001.jpg"), so search recursively
     available_images = set()
-    for f in os.listdir(images_folder):
-        if f.lower().endswith((".jpg", ".jpeg", ".png")):
-            available_images.add(f)
+    for dirpath, _, filenames in os.walk(images_folder):
+        for f in filenames:
+            if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                rel_path = os.path.relpath(os.path.join(dirpath, f), images_folder)
+                available_images.add(rel_path.replace(os.sep, "/"))
 
     if not available_images:
         raise ValueError(f"No image files found in {images_folder}")

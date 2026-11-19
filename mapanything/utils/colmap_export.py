@@ -514,6 +514,8 @@ def export_predictions_to_colmap(
 
             # Save with original image name
             img_path = os.path.join(images_dir, image_names[i])
+            # Image names may include subfolders (e.g. "cam0/frame_0001.jpg")
+            os.makedirs(os.path.dirname(img_path), exist_ok=True)
             img_pil.save(img_path, quality=95)
 
         print(f"Saved {num_frames} processed images to: {images_dir}")
